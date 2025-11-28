@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Detail - Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root { --sidebar-width: 250px; }
+        body { min-height: 100vh; }
+        .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem 0; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.8); padding: 0.75rem 1.5rem; transition: all 0.3s; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: white; background: rgba(255,255,255,0.1); }
+        .main-content { margin-left: var(--sidebar-width); padding: 2rem; }
+        .info-card { background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h4 class="text-center mb-4"><i class="bi bi-shield-check"></i> Admin Panel</h4>
+        <nav class="nav flex-column">
+            <a class="nav-link" href="/admin/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+            <a class="nav-link active" href="/admin/users"><i class="bi bi-people"></i> Users</a>
+            <a class="nav-link" href="/admin/businesses"><i class="bi bi-building"></i> Businesses</a>
+            <a class="nav-link" href="/admin/bookings"><i class="bi bi-calendar-check"></i> Bookings</a>
+            <a class="nav-link" href="/admin/categories"><i class="bi bi-grid"></i> Categories</a>
+            <hr class="text-white">
+            <a class="nav-link" href="/"><i class="bi bi-house"></i> View Site</a>
+            <a class="nav-link" href="/admin/logout"><i class="bi bi-box-arrow-right"></i> Logout</a>
+        </nav>
+    </div>
+    
+    <div class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>User Details</h2>
+            <a href="/admin/users" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="info-card">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Personal Information</h5>
+                    <p><strong>Name:</strong> {{ user.name }}</p>
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Phone:</strong> {{ user.phone }}</p>
+                    <p><strong>Address:</strong> {{ user.street_house }}, {{ user.city }}, {{ user.district }}</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge bg-{{ 'success' if user.is_active else 'danger' }}">
+                            {{ 'Active' if user.is_active else 'Inactive' }}
+                        </span>
+                    </p>
+                    <p><strong>Joined:</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h5>Actions</h5>
+                    <form method="POST" action="/admin/users/{{ user.user_id }}/toggle-status">
+                        <button type="submit" class="btn btn-{{ 'danger' if user.is_active else 'success' }} mb-2">
+                            <i class="bi bi-toggle-{{ 'off' if user.is_active else 'on' }}"></i>
+                            {{ 'Deactivate' if user.is_active else 'Activate' }} User
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-card">
+            <h5>Businesses Owned ({{ businesses|length }})</h5>
+            {% if businesses %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Business Name</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for business in businesses %}
+                        <tr>
+                            <td>{{ business.business_name }}</td>
+                            <td>{{ business.category }}</td>
+                            <td><span class="badge bg-{{ 'success' if business.is_active else 'danger' }}">{{ 'Active' if business.is_active else 'Inactive' }}</span></td>
+                            <td><a href="/admin/businesses/{{ business.business_id }}" class="btn btn-sm btn-outline-primary">View</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No businesses owned</p>
+            {% endif %}
+        </div>
+        
+        <div class="info-card">
+            <h5>Booking History ({{ bookings|length }})</h5>
+            {% if bookings %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Business</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for booking in bookings %}
+                        <tr>
+                            <td>{{ booking.booking_id[:8] }}</td>
+                            <td>{{ booking.business_id[:8] }}</td>
+                            <td>{{ booking.booking_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td><span class="badge bg-{{ 'warning' if booking.status == 'pending' else 'success' }}">{{ booking.status }}</span></td>
+                            <td><a href="/admin/bookings/{{ booking.booking_id }}" class="btn btn-sm btn-outline-primary">View</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No bookings yet</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

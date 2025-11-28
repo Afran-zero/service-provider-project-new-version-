@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ business.business_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+        }
+        
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: var(--primary-color) !important;
+        }
+        
+        .business-header-image {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+        
+        .gallery-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .gallery-image:hover {
+            transform: scale(1.05);
+        }
+        
+        .booking-sidebar {
+            position: sticky;
+            top: 100px;
+            border: 1px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 2rem;
+            background-color: #f8f9fa;
+        }
+        
+        .time-slot {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin: 0.5rem;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .time-slot:hover {
+            background-color: #e9ecef;
+        }
+        
+        .time-slot.selected {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .time-slot.unavailable {
+            background-color: #f5f5f5;
+            color: #999;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+        
+        .service-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-tools"></i> ServiceHub
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/services">Services</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/about">About Us</a></li>
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item dropdown ms-3">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">Account</a></li>
+                            <li><a class="dropdown-item" href="/my-bookings">My Bookings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/auth/logout">Logout</a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item ms-3">
+                        <a href="/auth/login" class="btn btn-outline-primary me-2">Login</a>
+                        <a href="/auth/register" class="btn btn-primary">Sign Up</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a href="/category/{{ business.category }}">{{ business.category }}</a></li>
+                <li class="breadcrumb-item active">{{ business.name }}</li>
+            </ol>
+        </nav>
+
+        <div class="row">
+            <!-- Business Details -->
+            <div class="col-lg-8">
+                <!-- Main Image -->
+                {% if business.profile_pic_url %}
+                <img src="{{ business.profile_pic_url }}" alt="{{ business.name }}" class="business-header-image mb-4">
+                {% else %}
+                <img src="https://via.placeholder.com/800x400?text=No+Image" alt="No Image" class="business-header-image mb-4">
+                {% endif %}
+
+                <!-- Business Info -->
+                <h2>{{ business.name }}</h2>
+                <p class="text-muted mb-3">
+                    <span class="badge bg-success">{{ business.category }}</span>
+                </p>
+                
+                <div class="mb-4">
+                    <h5><i class="bi bi-geo-alt"></i> Address</h5>
+                    <p>{{ business.street_house }}, {{ business.city }}, {{ business.district }}</p>
+                </div>
+
+                <div class="mb-4">
+                    <h5><i class="bi bi-telephone"></i> Contact</h5>
+                    <p>{{ business.phone }}</p>
+                </div>
+
+                <div class="mb-4">
+                    <h5><i class="bi bi-info-circle"></i> About</h5>
+                    <p>{{ business.description or 'Professional service provider ready to help you.' }}</p>
+                </div>
+
+                <!-- Gallery -->
+                {% if business.gallery_urls %}
+                <div class="mb-4">
+                    <h5><i class="bi bi-images"></i> Gallery</h5>
+                    <div class="row">
+                        {% for image in business.gallery_urls %}
+                        <div class="col-md-4 mb-3">
+                            <img src="{{ image }}" alt="Gallery Image" class="gallery-image" onclick="viewImage('{{ image }}')">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Services Offered -->
+                <div class="mb-4">
+                    <h5><i class="bi bi-briefcase"></i> Services Offered</h5>
+                    {% if services %}
+                        {% for service in services %}
+                        <div class="service-card">
+                            <h6>{{ service.name }}</h6>
+                            <p class="text-muted mb-2">{{ service.description }}</p>
+                            <p class="fw-bold">${{ service.price }}</p>
+                            <small class="text-muted">Duration: {{ service.duration_minutes }} minutes</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No services listed yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Booking Sidebar -->
+            <div class="col-lg-4" id="booking">
+                {% if current_user.is_authenticated %}
+                <div class="booking-sidebar">
+                    <h4 class="mb-4">Book an Appointment</h4>
+                    
+                    <form id="bookingForm">
+                        <div class="mb-3">
+                            <label class="form-label">Select Service</label>
+                            <select class="form-select" id="serviceSelect" required>
+                                <option value="">Choose a service...</option>
+                                {% for service in services %}
+                                <option value="{{ service.service_id }}" data-price="{{ service.price }}">
+                                    {{ service.name }} - ${{ service.price }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Select Date</label>
+                            <input type="text" class="form-control" id="datePicker" placeholder="Pick a date" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Select Time</label>
+                            <div id="timeSlots" class="d-flex flex-wrap justify-content-center">
+                                <!-- Time slots will be generated dynamically -->
+                            </div>
+                            <input type="hidden" id="selectedTime" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Additional Notes (Optional)</label>
+                            <textarea class="form-control" id="notes" rows="3" placeholder="Any special requirements..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100" id="bookBtn">
+                            <i class="bi bi-calendar-check"></i> Confirm Booking
+                        </button>
+                    </form>
+                </div>
+                {% else %}
+                <div class="booking-sidebar text-center">
+                    <h4 class="mb-4">Ready to Book?</h4>
+                    <p class="text-muted mb-4">Please log in to book an appointment</p>
+                    <a href="/auth/login?next=/business/{{ business.business_id }}" class="btn btn-primary w-100">
+                        Login to Book
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Booking</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to book this service?</p>
+                    <div id="bookingSummary"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="confirmBooking">Yes, Book Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="bookingToast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">Booking Status</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        const businessId = '{{ business.business_id }}';
+        let selectedDate = null;
+        let selectedTimeSlot = null;
+        let selectedServiceId = null;
+        
+        // Initialize date picker
+        const datePicker = flatpickr("#datePicker", {
+            minDate: "today",
+            dateFormat: "Y-m-d",
+            onChange: function(selectedDates, dateStr) {
+                selectedDate = dateStr;
+                loadTimeSlots(dateStr);
+            }
+        });
+        
+        // Generate time slots (10 AM to 10 PM)
+        function loadTimeSlots(date) {
+            const timeSlotsContainer = document.getElementById('timeSlots');
+            timeSlotsContainer.innerHTML = '';
+            
+            // Check availability for the selected date
+            fetch(`/booking/check-availability/${businessId}?date=${date}`)
+                .then(response => response.json())
+                .then(data => {
+                    const bookedSlots = data.booked_slots || [];
+                    
+                    for (let hour = 10; hour <= 22; hour++) {
+                        const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+                        const isBooked = bookedSlots.includes(timeStr);
+                        
+                        const slot = document.createElement('div');
+                        slot.className = `time-slot ${isBooked ? 'unavailable' : ''}`;
+                        slot.textContent = timeStr;
+                        
+                        if (!isBooked) {
+                            slot.onclick = () => selectTimeSlot(timeStr, slot);
+                        }
+                        
+                        timeSlotsContainer.appendChild(slot);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading time slots:', error);
+                });
+        }
+        
+        function selectTimeSlot(time, element) {
+            // Remove previous selection
+            document.querySelectorAll('.time-slot').forEach(slot => {
+                slot.classList.remove('selected');
+            });
+            
+            // Add selection
+            element.classList.add('selected');
+            selectedTimeSlot = time;
+            document.getElementById('selectedTime').value = time;
+        }
+        
+        // Handle form submission
+        document.getElementById('bookingForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            selectedServiceId = document.getElementById('serviceSelect').value;
+            const serviceName = document.getElementById('serviceSelect').selectedOptions[0].text;
+            const notes = document.getElementById('notes').value;
+            
+            if (!selectedServiceId || !selectedDate || !selectedTimeSlot) {
+                alert('Please select service, date, and time');
+                return;
+            }
+            
+            // Show confirmation modal
+            document.getElementById('bookingSummary').innerHTML = `
+                <p><strong>Service:</strong> ${serviceName}</p>
+                <p><strong>Date:</strong> ${selectedDate}</p>
+                <p><strong>Time:</strong> ${selectedTimeSlot}</p>
+                ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+            `;
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            modal.show();
+        });
+        
+        // Confirm booking
+        document.getElementById('confirmBooking').addEventListener('click', function() {
+            const notes = document.getElementById('notes').value;
+            
+            fetch('/booking/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    business_id: businessId,
+                    service_id: selectedServiceId,
+                    booking_date: selectedDate,
+                    booking_time: selectedTimeSlot,
+                    notes: notes
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+                modal.hide();
+                
+                const toast = new bootstrap.Toast(document.getElementById('bookingToast'));
+                const toastMessage = document.getElementById('toastMessage');
+                
+                if (data.success) {
+                    toastMessage.textContent = 'Booking created successfully!';
+                    toastMessage.className = 'toast-body bg-success text-white';
+                    toast.show();
+                    
+                    // Reset form
+                    document.getElementById('bookingForm').reset();
+                    document.getElementById('timeSlots').innerHTML = '';
+                    selectedDate = null;
+                    selectedTimeSlot = null;
+                    selectedServiceId = null;
+                } else {
+                    toastMessage.textContent = data.message || 'Failed to create booking';
+                    toastMessage.className = 'toast-body bg-danger text-white';
+                    toast.show();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while creating the booking');
+            });
+        });
+        
+        function viewImage(imageUrl) {
+            window.open(imageUrl, '_blank');
+        }
+    </script>
+</body>
+</html>

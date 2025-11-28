@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Update Service - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- Header -->
+            <div class="mb-4">
+                <h1 class="mb-2">Update Service</h1>
+                <p class="text-muted">Edit service for <strong>{{ business.name }}</strong></p>
+            </div>
+
+            <!-- Form Card -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-pencil-square"></i> Service Details
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" class="needs-validation" novalidate>
+                        <!-- Service Name -->
+                        <div class="mb-3">
+                            <label for="name" class="form-label">
+                                <i class="bi bi-tag"></i> Service Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   value="{{ service.name }}" required>
+                            <div class="invalid-feedback">
+                                Service name is required.
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-3">
+                            <label for="description" class="form-label">
+                                <i class="bi bi-file-text"></i> Description
+                            </label>
+                            <textarea class="form-control" id="description" name="description" 
+                                      rows="3">{{ service.description or '' }}</textarea>
+                            <small class="text-muted d-block mt-1">Optional: Provide details about the service</small>
+                        </div>
+
+                        <!-- Price -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="price" class="form-label">
+                                    <i class="bi bi-cash-coin"></i> Price <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="price" name="price" 
+                                           value="{{ "%.2f"|format(service.price) }}" step="0.01" min="0" required>
+                                </div>
+                                <div class="invalid-feedback">
+                                    Price is required and must be a valid number.
+                                </div>
+                            </div>
+
+                            <!-- Duration -->
+                            <div class="col-md-6 mb-3">
+                                <label for="duration_minutes" class="form-label">
+                                    <i class="bi bi-clock"></i> Duration <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="duration_minutes" name="duration_minutes" 
+                                           value="{{ service.duration_minutes }}" min="5" step="5" required>
+                                    <span class="input-group-text">minutes</span>
+                                </div>
+                                <div class="invalid-feedback">
+                                    Duration is required and must be at least 5 minutes.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Service Status -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-toggle2-on"></i> Status
+                            </label>
+                            <div class="form-check form-switch">
+                                {% if service.is_active %}
+                                <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                                {% else %}
+                                <input class="form-check-input" type="checkbox" id="is_active" name="is_active">
+                                {% endif %}
+                                <label class="form-check-label" for="is_active">
+                                    Active (Service is available for booking)
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Update Service
+                            </button>
+                            <a href="{{ url_for('business.list_services', business_id=business.business_id) }}" 
+                               class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Text -->
+            <div class="alert alert-info mt-4">
+                <i class="bi bi-lightbulb"></i> <strong>Tip:</strong> Keep your service information updated 
+                to provide accurate information to potential customers.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Bootstrap form validation
+(function () {
+    'use strict';
+    window.addEventListener('load', function () {
+        var forms = document.querySelectorAll('.needs-validation');
+        Array.prototype.slice.call(forms).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+</script>
+{% endblock %}

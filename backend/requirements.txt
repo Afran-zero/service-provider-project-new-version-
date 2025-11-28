@@ -1,0 +1,29 @@
+# Flask Framework (use 2.3.x for compatibility with Flask-Login)
+Flask==2.3.3
+# Pin Werkzeug to a version compatible with Flask-Login and Flask 2.3.x
+# Using 2.3.7 avoids breaking API changes introduced in Werkzeug 3.x
+Werkzeug==2.3.7
+# MongoDB ODM
+mongoengine==0.27.0
+pymongo==4.6.0
+# Security
+bcrypt==4.1.1
+# Environment Variables
+python-dotenv==1.0.0
+# Email Support (optional)
+Flask-Mail==0.9.1
+# Development Tools
+pytest==7.4.3
+pytest-flask==1.3.0
+pytest-cov==4.1.0
+# Code Quality
+flake8==6.1.0
+black==23.12.0
+# CORS Support (if needed for frontend)
+Flask-CORS==4.0.0
+# Session Management
+Flask-Session==0.5.0
+# Login management for Flask
+Flask-Login==0.6.2
+# Cloudinary for image storage
+cloudinary==1.36.0

@@ -1,0 +1,111 @@
+<!-- frontend/Auth/login.html -->
+<!-- Changes: Update placeholder to "Email or Phone", name to "identifier" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center vh-100">
+<div class="card shadow-lg p-4" style="width: 28rem;">
+  <h4 class="text-center mb-3">Login</h4>
+  {# Flash messages from server (auth_notifier) #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, msg in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  <form method="POST" id="loginForm">
+    <div class="mb-2">
+      <input type="text" name="identifier" class="form-control" placeholder="Email or Phone" required>
+    </div>
+    <div class="mb-2">
+      <input type="password" name="password" class="form-control" placeholder="Password" required>
+    </div>
+    {% if captcha %}
+      <h5>{{ captcha.challenge }}</h5>
+      {% if captcha.options %}
+      <div class="d-flex justify-content-around mb-2">
+        {# Hidden input will carry the selected captcha value when the user finally submits #}
+        <input type="hidden" name="captcha_answer" id="captcha_answer_input">
+        {% for color in captcha.options %}
+          {# Use type="button" so clicking a color doesn't submit the form immediately #}
+          <button type="button" class="btn rounded-circle captcha-choice"
+                  data-color="{{ color }}"
+                  aria-label="Choose {{ color }}"
+                 style="width: 60px; height: 60px; border: none; border-radius: 50%; background-color: '{{ color }}';"></button>
+        {% endfor %}
+      </div>
+      {% else %}
+        <input type="text" name="captcha_answer" class="form-control mb-2" placeholder="Enter captcha answer">
+      {% endif %}
+    {% endif %}
+    <div class="mb-2 text-center">
+      <a href="{{ url_for('auth.login', type='math' if captcha_type == 'color_ball' else 'color_ball') }}">Try {{ 'math' if captcha_type == 'color_ball' else 'color selection' }} captcha instead</a>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Login</button>
+  </form>
+  <p class="mt-2 text-center">
+    <a href="{{ url_for('auth.forgot') }}">Forgot Password?</a> | <a href="{{ url_for('auth.register') }}">Register</a>
+  </p>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Render the color options and wire up selection behavior.
+  const choices = document.querySelectorAll('.captcha-choice');
+  const hiddenInput = document.getElementById('captcha_answer_input');
+  choices.forEach(function(btn) {
+    const color = btn.getAttribute('data-color');
+    btn.addEventListener('click', function(e) {
+      // set the hidden input value to the selected color
+      hiddenInput.value = color;
+      // update visual selection
+      choices.forEach(function(other) {
+        other.classList.remove('border', 'border-3', 'border-dark');
+        other.setAttribute('aria-pressed', 'false');
+      });
+      btn.classList.add('border', 'border-3', 'border-dark');
+      btn.setAttribute('aria-pressed', 'true');
+    });
+  });
+  // accessibility: if user presses Enter while focused on a choice, select it
+  choices.forEach(function(btn) {
+    btn.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        btn.click();
+      }
+    });
+  });
+  // Prevent submitting if a captcha choice is required but not selected
+  const form = document.getElementById('loginForm');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      // if there's a hidden captcha input (options mode) and it's empty, block submit
+      if (hiddenInput && hiddenInput.name === 'captcha_answer' && !hiddenInput.value) {
+        e.preventDefault();
+        // show a temporary alert above the form
+        const alertPlaceholder = document.createElement('div');
+        alertPlaceholder.innerHTML = `
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            Please select the captcha option before logging in.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>`;
+        form.parentNode.insertBefore(alertPlaceholder, form);
+        return false;
+      }
+    });
+  }
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
