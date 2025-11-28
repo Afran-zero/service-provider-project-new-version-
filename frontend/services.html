@@ -82,18 +82,18 @@
 
     <div class="container">
         <div class="page-header">
-            <h1>Browse All Services</h1>
-            <p>Find the perfect service provider for your needs</p>
+            <h1>Browse Providers by Category</h1>
+            <p>Search by business name, category and location</p>
         </div>
 
         <div class="filters">
             <form method="get" action="/services">
                 <div class="filter-group">
                     <label for="search">Search</label>
-                    <input type="text" id="search" name="q" placeholder="Business name, description..." value="{{ search_query }}">
+                    <input type="text" id="search" name="q" placeholder="Business name..." value="{{ search_query }}">
                 </div>
                 <div class="filter-group">
-                    <label for="category">Category</label>
+                    <label for="category">Category </label>
                     <select id="category" name="category">
                         <option value="">All Categories</option>
                         {% for cat in categories %}
@@ -138,7 +138,7 @@
                 <p class="business-location">
                     <strong>📧</strong> {{ business.email }} | <strong>📞</strong> {{ business.phone }}
                 </p>
-                <a href="/business/{{ business.business_id }}" class="view-btn">View Details & Book</a>
+                <a href="/business/{{ business.business_id }}" class="view-btn">View Details</a>
             </div>
             {% endfor %}
         </div>

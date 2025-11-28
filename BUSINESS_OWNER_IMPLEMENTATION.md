@@ -240,6 +240,21 @@ class RejectBookingCommand(BookingCommand):
 - ✅ **Logging:** Commands are logged with execution details
 - ✅ **Observer Integration:** Commands trigger notifications
 
+### 3. **Strategy Pattern** (Profile Image Resolution + Lazy Loading)
+
+**Location:** `backend/controllers/business_controller.py#get_business_details`
+
+**Details:**
+
+- Source selection: prefer `Business.profile_pic_url`; fallback to owner `User.profile_pic_url` if missing.
+- Transformation: produce `profile_pic_lazy` (small, blurred) and `profile_pic_full` (optimized) URLs for progressive loading.
+- Frontend usage: `frontend/owner/view_business.html` starts with lazy src and swaps to full via IntersectionObserver.
+
+**Benefit:**
+
+- Keeps image display reliable even when business image is absent.
+- Improves perceived performance with progressive loading.
+
 ---
 
 ## Database Schema Changes
@@ -626,6 +641,18 @@ def create_business():
 **Template:** `owner/bookings.html`
 
 **Features:**
+#### 3a. Public Business View - `/business/<id>`
+
+Owner-view protection:
+
+- Backend flags owner view (`is_owner_viewing`) when `current_user.user_id == business.owner_id`.
+- Template (`frontend/business_detail.html`) hides booking UI for owners and shows a link back to the owner dashboard.
+
+Navigation rules:
+
+- Services page Back button points to `owner_business.view_business`.
+- Create Service Cancel points to `owner_business.view_business`.
+- Navbar/Footers: hide “Home” for business owners.
 
 - Filter by status
 - Display booking summary table

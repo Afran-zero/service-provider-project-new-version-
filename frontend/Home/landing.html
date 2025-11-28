@@ -155,6 +155,55 @@
             justify-content: center;
             font-size: 1.2rem;
         }
+        /* Category Carousel */
+        .category-carousel-wrapper {
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            margin-top: 1.5rem;
+        }
+        .category-carousel-wrapper::before,
+        .category-carousel-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 60px;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .category-carousel-wrapper::before {
+            left: 0;
+            background: linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,0));
+        }
+        .category-carousel-wrapper::after {
+            right: 0;
+            background: linear-gradient(to left, rgba(255,255,255,1), rgba(255,255,255,0));
+        }
+        .category-carousel {
+            display: flex;
+            flex-wrap: nowrap;
+            width: max-content;
+            animation: scrollCats 35s linear infinite;
+        }
+        .category-item {
+            flex: 0 0 auto;
+            width: 120px;
+            text-align: center;
+            padding: .75rem .5rem 1rem;
+            text-decoration: none;
+            color: #222;
+        }
+        .category-item .category-icon { margin-bottom: .5rem; }
+        .category-item:hover .category-icon { transform: scale(1.08); }
+        .category-carousel-wrapper:hover .category-carousel { animation-play-state: paused; }
+        @keyframes scrollCats {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        @media (max-width: 576px) {
+            .category-item { width: 100px; }
+        }
     </style>
 </head>
 <body>
@@ -241,20 +290,39 @@
     <!-- Categories Section -->
     <div class="container">
         <h2 class="section-title">Browse Services by Category</h2>
-        <div class="row">
-            {% for category in categories %}
-            <div class="col-6 col-md-3 col-lg-2">
-                <a href="/category/{{ category.name }}" class="text-decoration-none text-dark">
-                    <div class="category-card">
-                        <div class="category-icon">
-                            <i class="bi bi-{{ category.icon }}"></i>
-                        </div>
-                        <h6>{{ category.name }}</h6>
+        <!-- Auto-scrolling infinite category carousel -->
+        <div class="category-carousel-wrapper" aria-label="Scrolling list of service categories">
+            <div class="category-carousel" id="categoryCarousel">
+                {% for category in categories %}
+                <a href="/category/{{ category.name }}" class="category-item" draggable="false">
+                    <div class="category-icon">
+                        {% if category.icon and category.icon|length <= 3 and not category.icon.startswith('bi-') %}
+                            {{ category.icon }}
+                        {% else %}
+                            {% set icon_name = category.icon.replace('bi-','') if category.icon else 'grid' %}
+                            <i class="bi bi-{{ icon_name }}"></i>
+                        {% endif %}
                     </div>
+                    <div class="small fw-semibold">{{ category.display_name or category.name }}</div>
                 </a>
+                {% endfor %}
+                <!-- Duplicate for seamless loop -->
+                {% for category in categories %}
+                <a href="/category/{{ category.name }}" class="category-item" draggable="false" aria-hidden="true" tabindex="-1">
+                    <div class="category-icon">
+                        {% if category.icon and category.icon|length <= 3 and not category.icon.startswith('bi-') %}
+                            {{ category.icon }}
+                        {% else %}
+                            {% set icon_name = category.icon.replace('bi-','') if category.icon else 'grid' %}
+                            <i class="bi bi-{{ icon_name }}"></i>
+                        {% endif %}
+                    </div>
+                    <div class="small fw-semibold">{{ category.display_name or category.name }}</div>
+                </a>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
+        <div class="text-center mt-2 small text-muted">Hover to pause • Tap a category to view services</div>
     </div>
 
     <!-- Popular Businesses Section -->
@@ -265,11 +333,14 @@
             <div class="col-md-6 col-lg-4">
                 <div class="business-card">
                     <div class="position-relative">
-                        {% if business.profile_image %}
-                        <img src="{{ business.profile_image }}" alt="{{ business.business_name }}" class="business-image">
-                        {% else %}
-                        <img src="https://via.placeholder.com/400x250?text=No+Image" alt="No Image" class="business-image">
-                        {% endif %}
+                            {% if business.profile_image_full or business.profile_image_lazy %}
+                            <img src="{{ business.profile_image_lazy or business.profile_image_full }}"
+                                data-src="{{ business.profile_image_full or business.profile_image_lazy }}"
+                                alt="{{ business.business_name }}"
+                                class="business-image lazy-fade initial-blur">
+                            {% else %}
+                            <img src="https://via.placeholder.com/400x250?text=No+Image" alt="No Image" class="business-image">
+                            {% endif %}
                         <span class="category-badge">{{ business.category }}</span>
                     </div>
                     <div class="p-3">
@@ -308,5 +379,52 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // Progressive lazy loading for popular business images
+    document.addEventListener('DOMContentLoaded', () => {
+        const lazyImages = document.querySelectorAll('img.lazy-fade[data-src]');
+        lazyImages.forEach(img => {
+            if (img.classList.contains('initial-blur')) {
+                img.style.filter = 'blur(14px)';
+                img.style.transition = 'filter .6s ease';
+            }
+        });
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const fullSrc = img.getAttribute('data-src');
+                    if (fullSrc) {
+                        const highRes = new Image();
+                        highRes.onload = () => {
+                            img.src = fullSrc;
+                            img.style.filter = 'blur(0)';
+                        };
+                        highRes.src = fullSrc;
+                    }
+                    observer.unobserve(img);
+                }
+            });
+        }, { rootMargin: '200px' });
+        lazyImages.forEach(img => observer.observe(img));
+
+        // Dynamically adjust carousel animation duration based on width
+        const carousel = document.getElementById('categoryCarousel');
+        if (carousel) {
+            const items = carousel.querySelectorAll('.category-item');
+            let totalWidth = 0;
+            items.forEach(item => { totalWidth += item.offsetWidth; });
+            // We duplicated the list, so travel distance is half the total width
+            const basePixelsPerSecond = 120; // Adjust speed (higher = slower overall)
+            const duration = Math.max(20, Math.round((totalWidth / 2) / basePixelsPerSecond));
+            carousel.style.animationDuration = duration + 's';
+            window.addEventListener('resize', () => {
+                let w = 0; items.forEach(i => w += i.offsetWidth);
+                const d = Math.max(20, Math.round((w / 2) / basePixelsPerSecond));
+                carousel.style.animationDuration = d + 's';
+            });
+        }
+    });
+    </script>
 </body>
 </html>

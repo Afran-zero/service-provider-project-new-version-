@@ -32,18 +32,20 @@
                 </div>
                 <div class="card-body">
                     <div class="row mb-4">
-                        <div class="col-md-4">
-                            {% if business.profile_pic_url %}
-                            <img src="{{ business.profile_pic_url }}" alt="{{ business.name }}" 
-                                 class="img-fluid rounded" style="max-height: 250px; object-fit: cover;">
-                            {% else %}
-                            <div class="bg-light rounded d-flex align-items-center justify-content-center" 
-                                 style="height: 250px;">
-                                <i class="bi bi-image" style="font-size: 3rem; color: #ccc;"></i>
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-8">
+                                                <div class="col-md-4">
+                                                        {% if business.profile_pic_full or business.profile_pic_lazy %}
+                                                            <img src="{{ business.profile_pic_lazy or business.profile_pic_full }}"
+                                                                 data-src="{{ business.profile_pic_full or business.profile_pic_lazy }}"
+                                                                 alt="{{ business.name }}"
+                                                                 class="img-fluid rounded lazy-fade initial-blur"
+                                                                 style="max-height:250px;object-fit:cover;">
+                                                        {% else %}
+                                                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height:250px;">
+                                                                <i class="bi bi-image" style="font-size:3rem;color:#ccc;"></i>
+                                                            </div>
+                                                        {% endif %}
+                                                </div>
+                                                <div class="col-md-8">
                             <p class="mb-2">
                                 <strong>Email:</strong> <a href="mailto:{{ business.email }}">{{ business.email }}</a>
                             </p>
@@ -77,31 +79,43 @@
             </div>
 
             <!-- Gallery Section -->
-            {% if business.gallery_urls %}
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-light">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">
                         <i class="bi bi-images"></i> Gallery ({{ business.gallery_urls|length }})
                     </h5>
+                    <form class="d-flex" method="POST" action="{{ url_for('owner_business.add_gallery', business_id=business.business_id) }}" enctype="multipart/form-data">
+                        <input class="form-control form-control-sm" type="file" name="gallery_pics" multiple required>
+                        <button class="btn btn-sm btn-primary ms-2" type="submit">
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </form>
                 </div>
                 <div class="card-body">
+                    {% if business.gallery_urls %}
                     <div class="row g-3">
                         {% for image_url in business.gallery_urls %}
                         <div class="col-md-4">
                             <div class="position-relative">
                                 <img src="{{ image_url }}" alt="Gallery" class="img-fluid rounded" 
                                      style="height: 200px; object-fit: cover;">
-                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"
-                                        onclick="deleteImage('{{ image_url }}')">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <form method="POST" action="{{ url_for('owner_business.delete_gallery', business_id=business.business_id) }}" class="position-absolute top-0 end-0 m-2" onsubmit="return confirm('Delete this image?');">
+                                    <input type="hidden" name="gallery_url" value="{{ image_url }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
+                    {% else %}
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i> No gallery images yet. Upload using the form above.
+                        </div>
+                    {% endif %}
                 </div>
             </div>
-            {% endif %}
 
             <!-- Services Section -->
             <div class="card border-0 shadow-sm">
@@ -224,19 +238,41 @@
 </div>
 
 <script>
-function deleteImage(imageUrl) {
-    if (confirm('Are you sure you want to delete this image?')) {
-        // Implement image deletion via AJAX
-        console.log('Delete image:', imageUrl);
-    }
-}
-
 function toggleActiveStatus() {
     const action = "{{ 'deactivate' if business.is_active else 'activate' }}";
     if (confirm(`Are you sure you want to ${action} this business?`)) {
-        // Implement toggle via AJAX or form submission
         console.log('Toggle status:', action);
     }
 }
+
+// Lazy load progressive images (swap blurred placeholder to full-quality on intersection)
+document.addEventListener('DOMContentLoaded', () => {
+    const lazyImages = document.querySelectorAll('img.lazy-fade[data-src]');
+    // Apply initial blur via class instead of inline Jinja logic (lint friendly)
+    lazyImages.forEach(img => {
+        if (img.classList.contains('initial-blur')) {
+            img.style.filter = 'blur(8px)';
+            img.style.transition = 'filter .6s ease';
+        }
+    });
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const fullSrc = img.getAttribute('data-src');
+                if (fullSrc) {
+                    const highRes = new Image();
+                    highRes.onload = () => {
+                        img.src = fullSrc;
+                        img.style.filter = 'blur(0)';
+                    };
+                    highRes.src = fullSrc;
+                }
+                observer.unobserve(img);
+            }
+        });
+    }, { rootMargin: '100px' });
+    lazyImages.forEach(img => observer.observe(img));
+});
 </script>
 {% endblock %}

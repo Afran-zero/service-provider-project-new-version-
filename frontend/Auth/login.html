@@ -30,6 +30,17 @@
     <div class="mb-2">
       <input type="password" name="password" class="form-control" placeholder="Password" required>
     </div>
+    <div class="mb-3">
+      <label class="form-label"><strong>Login as</strong></label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="login_as" id="login_as_customer" value="customer" checked>
+        <label class="form-check-label" for="login_as_customer">Customer</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="login_as" id="login_as_owner" value="business_owner">
+        <label class="form-check-label" for="login_as_owner">Business Owner</label>
+      </div>
+    </div>
     {% if captcha %}
       <h5>{{ captcha.challenge }}</h5>
       {% if captcha.options %}
@@ -38,10 +49,10 @@
         <input type="hidden" name="captcha_answer" id="captcha_answer_input">
         {% for color in captcha.options %}
           {# Use type="button" so clicking a color doesn't submit the form immediately #}
-          <button type="button" class="btn rounded-circle captcha-choice"
-                  data-color="{{ color }}"
-                  aria-label="Choose {{ color }}"
-                 style="width: 60px; height: 60px; border: none; border-radius: 50%; background-color: '{{ color }}';"></button>
+            <button type="button" class="btn rounded-circle captcha-choice"
+              data-color="{{ color }}"
+              aria-label="Choose {{ color }}"
+             style="width: 60px; height: 60px; border: none; border-radius: 50%; background-color: {{ color }};"></button>
         {% endfor %}
       </div>
       {% else %}
@@ -62,6 +73,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // Render the color options and wire up selection behavior.
   const choices = document.querySelectorAll('.captcha-choice');
   const hiddenInput = document.getElementById('captcha_answer_input');
+  // Ensure color swatches render correctly in case inline style fails
+  choices.forEach(function(btn){
+    const color = btn.getAttribute('data-color');
+    if (color) { btn.style.backgroundColor = color; }
+  });
   choices.forEach(function(btn) {
     const color = btn.getAttribute('data-color');
     btn.addEventListener('click', function(e) {

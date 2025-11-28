@@ -68,9 +68,18 @@ def view_business(business_id):
     # gallery_urls is already populated by get_business_details from controller
     # No need to parse or manipulate it here
     
+    # Determine if current user is the owner; owners shouldn't be able to book their own services
+    is_owner_viewing = False
+    try:
+        if current_user.is_authenticated and business_details.get('owner_id') == getattr(current_user, 'user_id', None):
+            is_owner_viewing = True
+    except Exception:
+        pass
+
     return render_template('business_detail.html', 
                          business=business_details, 
-                         services=services)
+                         services=services,
+                         is_owner_viewing=is_owner_viewing)
 
 
 @business_bp.route('/<business_id>/update', methods=['GET', 'POST'])
@@ -217,7 +226,8 @@ def create_service(business_id):
         
         service = business_controller.create_service(business_id, data)
         flash(f'Service "{service.name}" created successfully!', 'success')
-        return redirect(url_for('business.list_services', business_id=business_id))
+        # Redirect owner back to their business owner view page
+        return redirect(url_for('owner_business.view_business', business_id=business_id))
         
     except Exception as e:
         flash(f'Error creating service: {str(e)}', 'danger')

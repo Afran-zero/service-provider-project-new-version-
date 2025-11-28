@@ -63,12 +63,9 @@
                     <p><strong>Created:</strong> {{ booking.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
                     
                     <hr>
-                    <h6>Update Status</h6>
+                    <h6>Update Status (Admin)</h6>
                     <form method="POST" action="/admin/bookings/{{ booking.booking_id }}/update-status">
                         <select name="status" class="form-select mb-2">
-                            <option value="pending" {{ 'selected' if booking.status == 'pending' else '' }}>Pending</option>
-                            <option value="accepted" {{ 'selected' if booking.status == 'accepted' else '' }}>Accepted</option>
-                            <option value="rejected" {{ 'selected' if booking.status == 'rejected' else '' }}>Rejected</option>
                             <option value="completed" {{ 'selected' if booking.status == 'completed' else '' }}>Completed</option>
                             <option value="cancelled" {{ 'selected' if booking.status == 'cancelled' else '' }}>Cancelled</option>
                         </select>

@@ -1,7 +1,19 @@
 # Design Patterns Implementation Guide
 
 ## Overview
-This document details the Factory, Command, and Adapter design patterns implemented in the backend.
+This document details all design patterns implemented in the backend: Factory, Command, Observer, Adapter, Decorator, Proxy, and Repository.
+
+## Quick Reference
+
+| Pattern | Purpose | Location | Use Case |
+|---------|---------|----------|----------|
+| **Factory** | Create objects with category-specific defaults | `factory_business.py`, `factory_category.py`, `factory_service.py` | Business/category/service creation |
+| **Repository** | Persist and retrieve domain objects | `models/category.py` (CategoryModel) + Factory | DB-backed category storage |
+| **Proxy** | Control access to objects/routes | `proxy_access.py` | Gate business owners from public home |
+| **Command** | Encapsulate requests as objects | `command_booking.py` | Booking actions (create, accept, reject, etc.) |
+| **Observer** | Notify multiple objects of state changes | `observer_booking.py` | Booking notifications (email/SMS) |
+| **Adapter** | Adapt incompatible interfaces | `cloudinary_adapter.py` | Image storage abstraction |
+| **Decorator** | Add behavior to routes | `decorator_auth.py` | Role-based route protection |
 
 ## 1. Factory Pattern
 
@@ -40,29 +52,55 @@ business = BusinessFactory.create_business(
 
 ### Factory: Categories (`backend/patterns/factory_category.py`)
 
-**Purpose:** Manage service categories with icons, tags, and search
+**Purpose:** Manage service categories with DB-aware merging, supporting both built-in and dynamically created categories (Repository + Factory combined)
 
-**Categories (12 total):**
-- cleaning, plumbing, electric, painting, carpentry, gardening
-- hvac, roofing, pest_control, appliance_repair, locksmith, moving
+**Features:**
+- 8 built-in categories: cleaning, plumbing, electrical, painting, carpentry, landscaping, hvac, other
+- Dynamic DB-backed categories via CategoryModel
+- Merges built-in + DB categories at read time (single source of truth)
+- Icon support: emoji (e.g., 🧹) or Bootstrap suffix (e.g., bi-brush-fill or brush-fill)
+- Search and autocomplete
+
+**Key Methods:**
+- `get_all_categories()` → List[Category] (merged built-in + DB)
+- `get_category(name)` → Category (searches DB first, then built-in)
+- `validate_category(name)` → bool (checks if category exists)
+- `search_categories(query)` → List[Category] (fuzzy search)
+- `get_category_suggestions(partial_query)` → List[dict] (autocomplete)
 
 **Usage:**
 ```python
 from patterns.factory_category import CategoryFactory
 
-# Get all categories
-categories = CategoryFactory.get_all_categories()
+# Get all categories (built-in + DB-backed)
+all_cats = CategoryFactory.get_all_categories()
 
 # Get specific category
-category = CategoryFactory.get_category('cleaning')
-# Returns: {'id': 'cleaning', 'name': 'Cleaning', 'icon': 'brush', 'tags': [...]}
+cat = CategoryFactory.get_category('cleaning')
+print(cat.display_name, cat.icon)  # "Cleaning Services", "🧹"
 
-# Search categories
+# Search
 results = CategoryFactory.search_categories('electric')
 
-# Get suggestions
-suggestions = CategoryFactory.get_category_suggestions('clean', limit=3)
+# Validate
+is_valid = CategoryFactory.validate_category('plumbing')  # True
 ```
+
+**Database Model** (`backend/models/category.py`):
+```python
+class CategoryModel(Document):
+    name = StringField(required=True, unique=True)           # Slug: cleaning, plumbing, etc.
+    display_name = StringField(required=True)                # "Cleaning Services"
+    description = StringField(default='')                   # Optional description
+    icon = StringField(default='')                          # 🧹 or bi-brush-fill or brush-fill
+    tags = ListField(StringField(), default=list)           # ['house', 'office', 'deep clean']
+```
+
+**Admin Operations** (via `/admin/categories`):
+- Create new category: POST `/admin/categories/create` with display_name, icon, tags
+- Edit category: POST `/admin/categories/<name>/edit` (update metadata)
+- Delete category: POST `/admin/categories/<name>/delete` (blocked if in use)
+- Note: Built-in categories are read-only
 
 ### Factory: Services (`backend/patterns/factory_service.py`)
 
@@ -96,7 +134,102 @@ services = ServiceFactory.create_from_template(
 ServiceFactory.bulk_create_services(business_id='123', services_data=[...])
 ```
 
-## 2. Command Pattern
+## 2. Repository Pattern
+
+### Category Repository (`backend/models/category.py` + Factory merge)
+
+**Purpose:** Persist and retrieve domain objects (categories) while keeping Factory agnostic to storage
+
+**Pattern Structure:**
+- **Domain Object:** `Category` (in-memory representation)
+- **Repository:** `CategoryModel` (MongoDB document)
+- **Factory:** `CategoryFactory` consumes repository via `_db_categories_map()`
+
+**How It Works:**
+1. Admin creates a category via `/admin/categories/create` → saved to MongoDB
+2. CategoryFactory reads DB via `_db_categories_map()` at each call
+3. Factory merges DB categories with built-ins
+4. Views query Factory (not DB directly), ensuring single source of truth
+
+**Benefits:**
+- Decouples storage (MongoDB) from business logic (Factory)
+- Built-in categories remain in code; custom categories in DB
+- Easy to swap storage backend (PostgreSQL, Redis, etc.) without changing views
+- Lazy loading: Factory only queries DB when `get_all_categories()` is called
+
+**Usage:**
+```python
+from models.category import CategoryModel
+from patterns.factory_category import CategoryFactory
+
+# Direct DB access (repository)
+cat = CategoryModel.objects(name='custom_plumbing').first()
+cat.display_name = 'Advanced Plumbing'
+cat.save()
+
+# Via Factory (preferred in views)
+all_cats = CategoryFactory.get_all_categories()  # Includes DB-backed
+custom = CategoryFactory.get_category('custom_plumbing')
+```
+
+## 3. Proxy Pattern
+
+### Access Proxy (`backend/patterns/proxy_access.py`)
+
+**Purpose:** Control access to resources (e.g., public home page) based on user role and context
+
+**Pattern Structure:**
+- **Subject (Real):** Original route handler (e.g., `home.index()`)
+- **Proxy:** `AccessProxy` intercepts, checks rules, delegates or redirects
+- **Client:** Route handler or `app.before_request`
+
+**Rules Implemented:**
+- Business owners cannot access public home (`/`, `/home`) → redirected to dashboard or create business flow
+- Customers and anonymous users can access home
+- Early interception in `app.before_request` for double-slash attacks and owner re-routing
+
+**Implementation:**
+```python
+# In app.py (before_request)
+if current_user.is_authenticated and getattr(current_user, 'role', None) == 'business_owner':
+    if request.path in ['/', '/home']:
+        from patterns.proxy_access import AccessProxy
+        proxy = AccessProxy(current_user)
+        return redirect(proxy.destination_for_owner())
+
+# In views/home.py (home.index)
+@home_bp.route('/', methods=['GET'])
+def index():
+    proxy = AccessProxy(current_user)
+    return proxy.render_or_redirect_home(lambda: render_template(...))
+```
+
+**AccessProxy Methods:**
+- `can_access_public_home()` → bool (role != business_owner)
+- `destination_for_owner()` → str (URL to dashboard or create business)
+- `render_or_redirect_home(handler)` → response (call handler or redirect)
+
+**Usage Example:**
+```python
+from patterns.proxy_access import AccessProxy
+
+proxy = AccessProxy(current_user)
+
+if not proxy.can_access_public_home():
+    redirect_url = proxy.destination_for_owner()
+    return redirect(redirect_url)
+
+# Otherwise, render original page
+return proxy.render_or_redirect_home(original_handler)
+```
+
+**Security Benefits:**
+✅ Single point for access decisions (maintainability)
+✅ Early interception prevents business owner from seeing marketing pages
+✅ Rules centralized (easy to add subscription tiers, feature flags, etc.)
+✅ Separation of concerns (routing vs. access control)
+
+## 4. Command Pattern
 
 ### Location: `backend/patterns/command_booking.py`
 
@@ -323,25 +456,44 @@ Set `FLASK_ENV=development` to automatically use mock adapters:
 - MockSMSAdapter - prints SMS to console
 - Cloudinary still works normally
 
-## Benefits
+## Benefits Summary
 
 ### Factory Pattern
-✅ Centralized business creation logic
-✅ Category-specific defaults
-✅ Consistent service structure
-✅ Easy to add new business types
+✅ Centralized business/category/service creation logic
+✅ Category-specific defaults (built-in or custom)
+✅ Consistent structure across objects
+✅ Easy to add new types without modifying existing code
+✅ DB-aware: merges built-in and dynamic categories
+
+### Repository Pattern
+✅ Decouples storage from business logic
+✅ Single source of truth for DB categories
+✅ Easy to swap storage backend (MongoDB → PostgreSQL, Redis, etc.)
+✅ Domain models (Category) stay pure; Repository (CategoryModel) handles persistence
+
+### Proxy Pattern
+✅ Centralized access control logic (single point of change)
+✅ Early interception prevents unauthorized access
+✅ Easy to extend with new rules (subscriptions, feature flags, etc.)
+✅ Separation of concerns: routing vs. access policy
 
 ### Command Pattern
-✅ Booking actions can be queued
-✅ Automatic retry on failure
-✅ Undo capability
-✅ Command history tracking
-✅ Separates request from execution
+✅ Booking actions can be queued and retried
+✅ Automatic retry on failure (max 3 attempts)
+✅ Undo capability via command history
+✅ Separates request from execution (flexibility)
+✅ Command history tracking for auditing
+
+### Observer Pattern
+✅ Decouples booking actions from notifications
+✅ Multiple observers can listen to same event
+✅ Easy to add new notification types (SMS, email, push, etc.)
+✅ Notification logic doesn't clutter command handlers
 
 ### Adapter Pattern
-✅ Swap implementations without changing code
+✅ Swap implementations without changing client code (Cloudinary → AWS S3)
 ✅ Easy testing with mock adapters
-✅ Consistent interface across services
+✅ Consistent interface across services (email, SMS, storage)
 ✅ External dependency isolation
 ✅ Configuration-based switching
 
@@ -429,12 +581,54 @@ def test_hardcoded_sms():
 ## File Locations
 
 ```
-backend/patterns/
-├── factory_business.py      # Business type factory
-├── factory_category.py      # Category management
-├── factory_service.py       # Service templates
-├── command_booking.py       # Booking commands
-├── cloudinary_adapter.py    # Image storage adapter
-├── email_adapter.py         # Email service adapter
-└── sms_adapter.py          # SMS service adapter (PIN: 123456)
+backend/
+├── patterns/
+│   ├── factory_business.py      # Business type factory
+│   ├── factory_category.py      # Category management (Factory + Repository merge)
+│   ├── factory_service.py       # Service templates
+│   ├── command_booking.py       # Booking commands
+│   ├── proxy_access.py          # Access control proxy (NEW)
+│   ├── cloudinary_adapter.py    # Image storage adapter
+│   ├── decorator_auth.py        # Role-based route decorators
+│   ├── observer_booking.py      # Booking notifications
+│   └── captcha_factory.py       # Captcha generation
+├── models/
+│   ├── user.py
+│   ├── business.py
+│   ├── booking.py
+│   ├── category.py              # CategoryModel (Repository) (NEW)
+│   └── service.py
+├── views/
+│   ├── home.py                  # Home/landing with Proxy gating
+│   ├── admin.py                 # Admin routes (categories, users, businesses, bookings)
+│   ├── auth.py
+│   ├── booking.py
+│   ├── business.py
+│   └── owner_business.py
+└── app.py                       # Main app with session/path security
 ```
+
+## Pattern Combinations
+
+### Factory + Repository (Category Management)
+- Built-in categories come from `CategoryFactory._categories` (code)
+- Custom categories come from `CategoryModel` (database)
+- `CategoryFactory._db_categories_map()` merges both at read time
+- Admin CRUD affects only DB-backed categories; built-ins remain immutable
+
+### Proxy + Decorator (Access Control)
+- `@admin_required` decorator blocks non-admins
+- `AccessProxy` gates business owners from public home
+- `app.before_request` provides early interception for path attacks
+- Separation: decorators for route entry; proxy for business logic
+
+### Command + Observer (Booking Workflow)
+- Command wraps booking actions (create, accept, cancel, etc.)
+- Observer is triggered on command execution to send notifications
+- Observer decouples notification logic from command execution
+
+### Adapter (External Services)
+- Cloudinary for image storage
+- Email for verification and notifications
+- SMS for verification and notifications
+- All implement common interfaces for easy testing/mocking

@@ -104,8 +104,14 @@ def update_profile(user_id, data, profile_picture_file=None):
                 public_id=f"user_{user_id}"
             )
             if cloudinary_response:
-                # Store the secure URL from Cloudinary
-                user.profile_pic_url = cloudinary_response['secure_url']
+                # upload_image_to_cloudinary currently returns a URL string (adapter returns dict internally)
+                if isinstance(cloudinary_response, str):
+                    user.profile_pic_url = cloudinary_response
+                elif isinstance(cloudinary_response, dict):
+                    # Fallback if future change returns dict
+                    user.profile_pic_url = cloudinary_response.get('url') or cloudinary_response.get('secure_url')
+                else:
+                    return None, "Unexpected Cloudinary response type"
             else:
                 return None, "Failed to upload profile picture"
         except Exception as e:

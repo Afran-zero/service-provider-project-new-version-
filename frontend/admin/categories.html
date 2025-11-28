@@ -33,6 +33,38 @@
     
     <div class="main-content">
         <h2 class="mb-4">Service Categories</h2>
+
+        <!-- Create Category Form -->
+        <div class="category-card mb-4">
+            <h5 class="mb-3">Add New Category</h5>
+            <form method="POST" action="/admin/categories/create" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Display Name</label>
+                    <input type="text" name="display_name" class="form-control" placeholder="e.g., Pest Control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">ID (slug)</label>
+                    <input type="text" name="name" class="form-control" placeholder="auto if blank">
+                    <small class="text-muted">letters, numbers, dashes</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Icon</label>
+                    <input type="text" name="icon" class="form-control" placeholder="🪲 or bi-bug-fill or bug-fill">
+                    <small class="text-muted">emoji or Bootstrap icon name</small>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">Description</label>
+                    <input type="text" name="description" class="form-control" placeholder="Describe the category (optional)">
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">Tags</label>
+                    <input type="text" name="tags" class="form-control" placeholder="comma,separated,tags (optional)">
+                </div>
+                <div class="col-md-12 text-end">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Create</button>
+                </div>
+            </form>
+        </div>
         
         <div class="row">
             {% for category in categories or [] %}
@@ -40,20 +72,65 @@
                 <div class="category-card">
                     <div class="d-flex align-items-center mb-3">
                         <div class="category-icon me-3">
-                            <!-- Use Bootstrap icon class name from backend -->
-                            <i class="bi {{ category.bootstrap_icon or 'bi-grid' }}"></i>
+                            {% if category.icon and (category.icon|length <= 3) and not category.icon.startswith('bi-') %}
+                                {{ category.icon }}
+                            {% else %}
+                                {% set icon_name = category.icon.replace('bi-','') if category.icon else 'grid' %}
+                                <i class="bi bi-{{ icon_name }}"></i>
+                            {% endif %}
                         </div>
                         <div>
-                            <h5 class="mb-0">{{ category.name }}</h5>
+                            <h5 class="mb-0">{{ category.display_name or category.name }}</h5>
                             <small class="text-muted">{{ category.count|default(0) }} businesses</small>
+                            {% if not category.is_db %}
+                                <div class="text-muted small">Built-in category (not editable)</div>
+                            {% endif %}
                         </div>
                     </div>
                     <p class="text-muted mb-2">
                         <strong>Tags:</strong> {{ category.tags|default([])|join(', ') }}
                     </p>
-                    <a href="/admin/businesses?category={{ category.id }}" class="btn btn-sm btn-outline-primary">
-                        View Businesses
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="/admin/businesses?category={{ category.id }}" class="btn btn-sm btn-outline-primary">
+                            View Businesses
+                        </a>
+                        {% if category.is_db %}
+                        <!-- Edit inline form -->
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-{{ category.id }}" aria-expanded="false" aria-controls="edit-{{ category.id }}">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <form method="POST" action="/admin/categories/{{ category.id }}/delete" onsubmit="return confirm('Delete category \"{{ category.display_name or category.name }}\"? This cannot be undone.');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% if category.is_db %}
+                    <div class="collapse mt-3" id="edit-{{ category.id }}">
+                        <form method="POST" action="/admin/categories/{{ category.id }}/edit" class="row g-2">
+                            <div class="col-12">
+                                <label class="form-label">Display Name</label>
+                                <input type="text" name="display_name" class="form-control" value="{{ category.display_name }}" placeholder="Display name">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Icon</label>
+                                <input type="text" name="icon" class="form-control" value="{{ category.icon }}" placeholder="🧹 or bi-brush-fill or brush-fill">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <input type="text" name="description" class="form-control" value="{{ category.description }}" placeholder="Description (optional)">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Tags</label>
+                                <input type="text" name="tags" class="form-control" value="{{ category.tags|join(', ') }}" placeholder="comma,separated,tags">
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check"></i> Save</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}

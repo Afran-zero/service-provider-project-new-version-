@@ -92,7 +92,39 @@ def dashboard():
         completed_bookings = Booking.objects(status='completed').count()
         cancelled_bookings = Booking.objects(status='cancelled').count()
         # Convert to list to catch errors before template rendering
-        recent_bookings = list(Booking.objects().order_by('-created_at').limit(10))
+        recent = list(Booking.objects().order_by('-created_at').limit(10))
+        # Enrich recent bookings with customer and business owner names
+        enriched_recent = []
+        for bk in recent:
+            cust_name = None
+            owner_name = None
+            try:
+                cust = User.objects.get(user_id=bk.customer_id)
+                cust_name = cust.name
+            except Exception:
+                cust_name = None
+            try:
+                biz = Business.objects.get(business_id=bk.business_id)
+                if getattr(biz, 'owner_id', None):
+                    try:
+                        owner = User.objects.get(user_id=biz.owner_id)
+                        owner_name = owner.name
+                    except Exception:
+                        owner_name = getattr(biz, 'owner_name', None)
+                else:
+                    owner_name = getattr(biz, 'owner_name', None)
+            except Exception:
+                owner_name = None
+            enriched_recent.append({
+                'booking_id': bk.booking_id,
+                'status': bk.status,
+                'created_at': bk.created_at,
+                'customer_id': bk.customer_id,
+                'business_id': bk.business_id,
+                'customer_name': cust_name,
+                'owner_name': owner_name
+            })
+        recent_bookings = enriched_recent
     except Exception as e:
         print(f"Warning: Booking query failed: {e}")
         total_bookings = 0
@@ -189,11 +221,30 @@ def businesses():
         businesses_list = Business.objects(**query).order_by('-created_at')
     else:
         businesses_list = Business.objects().order_by('-created_at')
+
+    # Enrich with owner display name resolved from User where possible
+    enriched = []
+    for b in businesses_list:
+        owner_display = None
+        try:
+            if getattr(b, 'owner_id', None):
+                u = User.objects.get(user_id=b.owner_id)
+                owner_display = u.name
+            elif getattr(b, 'owner_name', None):
+                owner_display = b.owner_name
+        except Exception:
+            owner_display = getattr(b, 'owner_name', None)
+        # Attach attribute for template usage
+        try:
+            setattr(b, 'owner_display_name', owner_display)
+        except Exception:
+            pass
+        enriched.append(b)
     
     categories = CategoryFactory.get_all_categories()
     
     return render_template('admin/businesses.html', 
-                         businesses=businesses_list,
+                         businesses=enriched,
                          categories=categories,
                          selected_category=category,
                          search=search)
@@ -202,86 +253,9 @@ def businesses():
 @admin_bp.route('/businesses/create', methods=['GET', 'POST'])
 @admin_required
 def create_business():
-    """Create a new business using the Builder pattern"""
-    if request.method == 'GET':
-        # Show create business form
-        categories = CategoryFactory.get_all_categories()
-        return render_template('admin/create_business.html', categories=categories)
-    
-    # POST: Create business from form data
-    try:
-        # Use BusinessBuilder to construct and save the business
-        builder = (BusinessBuilder()
-                   .set_name(request.form.get('name'))
-                   .set_email(request.form.get('email'))
-                   .set_phone(request.form.get('phone'))
-                   .set_street_house(request.form.get('street_house'))
-                   .set_city(request.form.get('city'))
-                   .set_district(request.form.get('district'))
-                   .set_category(request.form.get('category')))
-        
-        # Optional fields
-        if request.form.get('description'):
-            builder.set_description(request.form.get('description'))
-        if request.form.get('owner_name'):
-            builder.set_owner_name(request.form.get('owner_name'))
-        
-        # Build and save
-        business = builder.build_and_save()
-
-        # Create any services provided in the form
-        try:
-            service_names = request.form.getlist('service_name[]')
-            service_prices = request.form.getlist('service_price[]')
-            service_durations = request.form.getlist('service_duration[]')
-            service_descriptions = request.form.getlist('service_description[]')
-
-            for i, name in enumerate(service_names):
-                if not name or not name.strip():
-                    continue
-                price = 0.0
-                duration = 60
-                description = None
-                try:
-                    if i < len(service_prices) and service_prices[i].strip():
-                        price = float(service_prices[i])
-                except Exception:
-                    price = 0.0
-                try:
-                    if i < len(service_durations) and service_durations[i].strip():
-                        duration = int(service_durations[i])
-                except Exception:
-                    duration = 60
-                if i < len(service_descriptions) and service_descriptions[i].strip():
-                    description = service_descriptions[i].strip()
-
-                svc = Service(
-                    business_id=business.business_id,
-                    name=name.strip(),
-                    description=description,
-                    price=price,
-                    duration_minutes=duration
-                )
-                svc.save()
-        except Exception as e:
-            # Non-fatal: log and continue; show flash so admin knows
-            flash(f'Warning: some services could not be saved: {str(e)}', 'danger')
-        
-        flash(f'Business "{business.name}" created successfully!', 'success')
-        return redirect(url_for('admin.business_detail', business_id=business.business_id))
-    
-    except ValueError as e:
-        # Validation error from builder
-        flash(f'Error creating business: {str(e)}', 'danger')
-        categories = CategoryFactory.get_all_categories()
-        return render_template('admin/create_business.html', 
-                             categories=categories,
-                             form_data=request.form.to_dict()), 400
-    except Exception as e:
-        # Other unexpected errors
-        flash(f'Unexpected error: {str(e)}', 'danger')
-        categories = CategoryFactory.get_all_categories()
-        return render_template('admin/create_business.html', categories=categories), 500
+    """Admins are not allowed to create businesses via UI; redirect with message."""
+    flash('Admins cannot create businesses. Please ask the business owner to create their own profile.', 'warning')
+    return redirect(url_for('admin.businesses'))
 
 
 @admin_bp.route('/businesses/<business_id>')
@@ -333,13 +307,46 @@ def bookings():
     status = request.args.get('status', '')
     
     if status:
-        bookings_list = Booking.objects(status=status).order_by('-created_at')
+        raw = Booking.objects(status=status).order_by('-created_at')
     else:
-        bookings_list = Booking.objects().order_by('-created_at')
-    
-    return render_template('admin/bookings.html', 
-                         bookings=bookings_list,
-                         selected_status=status)
+        raw = Booking.objects().order_by('-created_at')
+
+    # Enrich with customer name, business name, and owner name
+    bookings_list = []
+    for bk in raw:
+        cust_name = None
+        biz_name = None
+        owner_name = None
+        try:
+            cust = User.objects.get(user_id=bk.customer_id)
+            cust_name = cust.name
+        except Exception:
+            pass
+        try:
+            biz = Business.objects.get(business_id=bk.business_id)
+            biz_name = getattr(biz, 'name', None)
+            if getattr(biz, 'owner_id', None):
+                try:
+                    owner = User.objects.get(user_id=biz.owner_id)
+                    owner_name = owner.name
+                except Exception:
+                    owner_name = getattr(biz, 'owner_name', None)
+            else:
+                owner_name = getattr(biz, 'owner_name', None)
+        except Exception:
+            pass
+        # Attach attributes dynamically for template rendering
+        try:
+            setattr(bk, 'customer_name', cust_name)
+            setattr(bk, 'business_name', biz_name)
+            setattr(bk, 'owner_name', owner_name)
+        except Exception:
+            pass
+        bookings_list.append(bk)
+
+    return render_template('admin/bookings.html',
+                           bookings=bookings_list,
+                           selected_status=status)
 
 
 @admin_bp.route('/bookings/<booking_id>')
@@ -377,14 +384,13 @@ def update_booking_status(booking_id):
     try:
         booking = Booking.objects.get(booking_id=booking_id)
         new_status = request.form.get('status')
-        
-        if new_status in ['requested', 'accepted', 'rejected', 'completed', 'cancelled']:
-            # Update status using the model's update_status method
-            booking.update_status(new_status)
-            
-            flash(f'Booking status updated to {new_status}', 'success')
-        else:
-            flash('Invalid status', 'danger')
+        # Admin restriction: only allow setting to completed or cancelled
+        if new_status not in ['completed', 'cancelled']:
+            flash('Admins can only set a booking to Completed or Cancelled.', 'danger')
+            return redirect(url_for('admin.booking_detail', booking_id=booking_id))
+        # Update status using the model's update_status method
+        booking.update_status(new_status)
+        flash(f'Booking status updated to {new_status}', 'success')
     except Booking.DoesNotExist:
         flash('Booking not found', 'danger')
     
@@ -396,21 +402,125 @@ def update_booking_status(booking_id):
 def categories():
     """List all categories"""
     categories_list = CategoryFactory.get_all_categories()
-    
-    # Count businesses per category and add Bootstrap icon class
+
+    # Determine which categories are DB-backed so we can allow deletion only for those
+    try:
+        from models.category import CategoryModel
+        db_names = set([c.name for c in CategoryModel.objects()])
+    except Exception:
+        db_names = set()
+
+    # Count businesses per category and attach id/count; icon comes from category.icon
     for category in categories_list:
         try:
             setattr(category, 'id', category.name)
             setattr(category, 'count', Business.objects(category=category.name).count())
-            # Add Bootstrap icon class (e.g., 'bi-broom') for template rendering
-            setattr(category, 'bootstrap_icon', CategoryFactory.get_bootstrap_icon(category.name))
+            setattr(category, 'is_db', category.name in db_names)
         except Exception:
-            # Defensive fallback: ensure attributes exist even if query fails
             setattr(category, 'id', getattr(category, 'name', None))
             setattr(category, 'count', 0)
-            setattr(category, 'bootstrap_icon', 'bi-grid')
-    
+            try:
+                setattr(category, 'is_db', category.name in db_names)
+            except Exception:
+                setattr(category, 'is_db', False)
+
     return render_template('admin/categories.html', categories=categories_list)
+
+@admin_bp.route('/categories/create', methods=['POST'])
+@admin_required
+def create_category():
+    """Create a new service category (Factory + Repository).
+
+    Uses Factory pattern at read time; persists via CategoryModel (Repository) so new
+    categories appear dynamically across the app.
+    """
+    from models.category import CategoryModel
+    import re
+    display_name = (request.form.get('display_name') or '').strip()
+    name = (request.form.get('name') or '').strip()
+    description = (request.form.get('description') or '').strip()
+    icon = (request.form.get('icon') or '').strip()
+    tags_raw = (request.form.get('tags') or '').strip()
+    if not display_name and not name:
+        flash('Please provide at least a Display Name for the category.', 'danger')
+        return redirect(url_for('admin.categories'))
+    # Slugify name if not provided
+    if not name:
+        slug = re.sub(r'[^a-zA-Z0-9\s-]', '', display_name).strip().lower()
+        slug = re.sub(r'\s+', '-', slug)
+        name = slug or 'category'
+    # Normalize icon: allow emoji; if starts with 'bi-' keep; if looks like bootstrap suffix keep as-is
+    if icon.startswith('bi-'):
+        icon = icon  # stored with bi- prefix; frontends will handle both
+    # Parse tags
+    tags = [t.strip() for t in tags_raw.split(',') if t.strip()] if tags_raw else []
+    try:
+        if CategoryModel.objects(name=name).first():
+            flash('A category with this name already exists.', 'warning')
+            return redirect(url_for('admin.categories'))
+        CategoryModel(
+            name=name,
+            display_name=display_name or name,
+            description=description,
+            icon=icon,
+            tags=tags
+        ).save()
+        flash(f'Category "{display_name or name}" created successfully.', 'success')
+    except Exception as e:
+        flash(f'Error creating category: {str(e)}', 'danger')
+    return redirect(url_for('admin.categories'))
+
+
+@admin_bp.route('/categories/<name>/delete', methods=['POST'])
+@admin_required
+def delete_category(name):
+    """Delete a DB-backed category if unused by any business.
+
+    Built-in categories are not deletable. If any Business references the
+    category by name, deletion is blocked to avoid orphaned references.
+    """
+    try:
+        from models.category import CategoryModel
+        cat = CategoryModel.objects(name=name).first()
+        if not cat:
+            flash('This category is built-in or does not exist in the database and cannot be deleted.', 'warning')
+            return redirect(url_for('admin.categories'))
+        usage = Business.objects(category=name).count()
+        if usage > 0:
+            flash(f'Cannot delete "{name}": it is used by {usage} business(es).', 'danger')
+            return redirect(url_for('admin.categories'))
+        cat.delete()
+        flash(f'Category "{name}" deleted successfully.', 'success')
+    except Exception as e:
+        flash(f'Error deleting category: {str(e)}', 'danger')
+    return redirect(url_for('admin.categories'))
+
+
+@admin_bp.route('/categories/<name>/edit', methods=['POST'])
+@admin_required
+def edit_category(name):
+    """Edit a DB-backed category's metadata (display_name, description, icon, tags)."""
+    try:
+        from models.category import CategoryModel
+        cat = CategoryModel.objects(name=name).first()
+        if not cat:
+            flash('Built-in categories cannot be edited here.', 'warning')
+            return redirect(url_for('admin.categories'))
+        display_name = (request.form.get('display_name') or '').strip()
+        description = (request.form.get('description') or '').strip()
+        icon = (request.form.get('icon') or '').strip()
+        tags_raw = (request.form.get('tags') or '').strip()
+        tags = [t.strip() for t in tags_raw.split(',') if t.strip()] if tags_raw else []
+        if display_name:
+            cat.display_name = display_name
+        cat.description = description
+        cat.icon = icon
+        cat.tags = tags
+        cat.save()
+        flash(f'Category "{cat.name}" updated successfully.', 'success')
+    except Exception as e:
+        flash(f'Error updating category: {str(e)}', 'danger')
+    return redirect(url_for('admin.categories'))
 
 
 @admin_bp.route('/api/stats')

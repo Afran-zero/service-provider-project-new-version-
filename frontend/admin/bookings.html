@@ -69,8 +69,24 @@
                         {% for booking in bookings %}
                         <tr>
                             <td>{{ booking.booking_id[:8] }}</td>
-                            <td>{{ booking.customer_id[:8] }}</td>
-                            <td>{{ booking.business_id[:8] }}</td>
+                            <td>
+                                {% if booking.customer_name %}
+                                    {{ booking.customer_name }}
+                                    <div class="text-muted small">ID: {{ booking.customer_id[:8] }}</div>
+                                {% else %}
+                                    {{ booking.customer_id[:8] }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if booking.business_name or booking.owner_name %}
+                                    {{ booking.business_name or booking.business_id[:8] }}
+                                    {% if booking.owner_name %}
+                                        <div class="text-muted small">Owner: {{ booking.owner_name }}</div>
+                                    {% endif %}
+                                {% else %}
+                                    {{ booking.business_id[:8] }}
+                                {% endif %}
+                            </td>
                             <td>{{ booking.booking_time.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
                                 <span class="badge bg-{{ 'warning' if booking.status == 'pending' else 'info' if booking.status == 'accepted' else 'success' if booking.status == 'completed' else 'danger' }}">

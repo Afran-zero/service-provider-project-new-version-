@@ -35,14 +35,11 @@
                             <label for="category" class="form-label">Service Category <span class="text-danger">*</span></label>
                             <select class="form-select" id="category" name="category" required>
                                 <option value="">-- Select Category --</option>
-                                <option value="plumbing" {% if data and data.get('category') == 'plumbing' %}selected{% endif %}>Plumbing</option>
-                                <option value="cleaning" {% if data and data.get('category') == 'cleaning' %}selected{% endif %}>Cleaning</option>
-                                <option value="electrical" {% if data and data.get('category') == 'electrical' %}selected{% endif %}>Electrical</option>
-                                <option value="painting" {% if data and data.get('category') == 'painting' %}selected{% endif %}>Painting</option>
-                                <option value="carpentry" {% if data and data.get('category') == 'carpentry' %}selected{% endif %}>Carpentry</option>
-                                <option value="landscaping" {% if data and data.get('category') == 'landscaping' %}selected{% endif %}>Landscaping</option>
-                                <option value="hvac" {% if data and data.get('category') == 'hvac' %}selected{% endif %}>HVAC</option>
-                                <option value="other" {% if data and data.get('category') == 'other' %}selected{% endif %}>Other</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.name }}" {% if data and data.get('category') == cat.name %}selected{% endif %}>
+                                    {{ cat.display_name or cat.name }}
+                                </option>
+                                {% endfor %}
                             </select>
                         </div>
 

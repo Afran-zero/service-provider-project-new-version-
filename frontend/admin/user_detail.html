@@ -53,6 +53,15 @@
                 <div class="col-md-6">
                     <h5>Personal Information</h5>
                     <p><strong>Name:</strong> {{ user.name }}</p>
+                    <p><strong>Role:</strong>
+                        {% if user.role == 'business_owner' %}
+                            <span class="badge bg-info">Business Owner</span>
+                        {% elif user.role == 'customer' %}
+                            <span class="badge bg-secondary">Customer</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">{{ user.role or 'Unknown' }}</span>
+                        {% endif %}
+                    </p>
                     <p><strong>Email:</strong> {{ user.email }}</p>
                     <p><strong>Phone:</strong> {{ user.phone }}</p>
                     <p><strong>Address:</strong> {{ user.street_house }}, {{ user.city }}, {{ user.district }}</p>

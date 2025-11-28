@@ -197,7 +197,7 @@
 
             <!-- Booking Sidebar -->
             <div class="col-lg-4" id="booking">
-                {% if current_user.is_authenticated %}
+                {% if current_user.is_authenticated and not is_owner_viewing %}
                 <div class="booking-sidebar">
                     <h4 class="mb-4">Book an Appointment</h4>
                     
@@ -237,12 +237,20 @@
                         </button>
                     </form>
                 </div>
-                {% else %}
+                {% elif not current_user.is_authenticated %}
                 <div class="booking-sidebar text-center">
                     <h4 class="mb-4">Ready to Book?</h4>
                     <p class="text-muted mb-4">Please log in to book an appointment</p>
                     <a href="/auth/login?next=/business/{{ business.business_id }}" class="btn btn-primary w-100">
                         Login to Book
+                    </a>
+                </div>
+                {% else %}
+                <div class="booking-sidebar text-center">
+                    <h4 class="mb-4">Owner View</h4>
+                    <p class="text-muted mb-2">As the business owner, you cannot book your own services.</p>
+                    <a href="{{ url_for('owner_business.view_business', business_id=business.business_id) }}" class="btn btn-outline-secondary w-100">
+                        Back to Owner Dashboard
                     </a>
                 </div>
                 {% endif %}

@@ -29,9 +29,22 @@
 <body class="bg-light">
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container">
-      <a class="navbar-brand" href="{{ url_for('home.index') }}">Service Provider</a>
+      {# Brand redirects based on role using Proxy access logic #}
+      {% if current_user.is_authenticated and current_user.role == 'business_owner' %}
+        <a class="navbar-brand" href="{{ url_for('owner_business.dashboard') }}">Service Provider</a>
+      {% else %}
+        <a class="navbar-brand" href="{{ url_for('home.index') }}">Service Provider</a>
+      {% endif %}
       <div class="ms-auto">
-        <a href="{{ url_for('home.index') }}" class="btn btn-outline-light btn-sm me-2">Home</a>
+        {% if current_user.is_authenticated and current_user.role == 'business_owner' %}
+          <a href="{{ url_for('owner_business.dashboard') }}" class="btn btn-outline-light btn-sm me-2">Dashboard</a>
+          {% set primary_business = owner_primary_business_id if owner_primary_business_id is defined else None %}
+          {% if primary_business %}
+            <a href="{{ url_for('owner_business.view_business', business_id=primary_business) }}" class="btn btn-outline-light btn-sm me-2">My Business</a>
+          {% endif %}
+        {% else %}
+          <a href="{{ url_for('home.index') }}" class="btn btn-outline-light btn-sm me-2">Home</a>
+        {% endif %}
         <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
       </div>
     </div>

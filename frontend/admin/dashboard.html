@@ -214,6 +214,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Customer</th>
+                                    <th>Owner</th>
                                     <th>Status</th>
                                     <th>Date</th>
                                 </tr>
@@ -222,8 +223,9 @@
                                 {% for booking in recent_bookings %}
                                 <tr>
                                     <td><a href="/admin/bookings/{{ booking.booking_id }}">{{ booking.booking_id[:8] }}</a></td>
-                                    <td>{{ booking.customer_id[:8] }}</td>
-                                    <td><span class="badge bg-{{ 'warning' if booking.status == 'pending' else 'success' }}">{{ booking.status }}</span></td>
+                                    <td>{{ booking.customer_name or (booking.customer_id[:8] if booking.customer_id) }}</td>
+                                    <td>{{ booking.owner_name or '-' }}</td>
+                                    <td><span class="badge bg-{{ 'warning' if booking.status == 'pending' else 'info' if booking.status == 'accepted' else 'success' if booking.status == 'completed' else 'danger' }}">{{ booking.status }}</span></td>
                                     <td>{{ booking.created_at.strftime('%Y-%m-%d') }}</td>
                                 </tr>
                                 {% endfor %}

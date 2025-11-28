@@ -18,37 +18,21 @@ auth_bp = Blueprint('auth', __name__, template_folder='../../frontend/Auth')
 def register():
     if request.method == 'POST':
         data = request.form.to_dict()
-        verification_method = data.get('verification_method', 'captcha')
+        # Registration now supports only email or phone verification; captcha removed
+        verification_method = data.get('verification_method', 'email')
         role = data.get('role', 'customer')  # Get role from form, default to customer
-        
-        # Handle captcha verification if selected
-        if verification_method == 'captcha':
-            user_captcha = request.form.get('captcha_answer')
-            correct_answer = session.get('reg_captcha_answer')
-            
-            if user_captcha != correct_answer:
-                auth_notifier.notify("Captcha incorrect. Try again.", "danger")
-                captcha = CaptchaFactory.create_captcha()
-                session['reg_captcha_answer'] = captcha['answer']
-                return render_template('register_v2.html', captcha=captcha, role=role)
         
         # Register user with role
         user, error = register_user(data, role=role)
         if error:
             auth_notifier.notify(error, 'danger')
-            captcha = CaptchaFactory.create_captcha()
-            session['reg_captcha_answer'] = captcha['answer']
-            return render_template('register_v2.html', captcha=captcha, role=role)
+            return render_template('register_v2.html', role=role)
         
-        # Handle verification method
-        if verification_method == 'captcha':
-            # Captcha already verified, redirect to login
-            auth_notifier.notify("Registration successful! You can now login.", "success")
-            return redirect(url_for('auth.login'))
-        elif verification_method == 'email':
+        # Handle verification method (email or phone only)
+        if verification_method == 'email':
             # Send email verification code
             from utils import generate_verification_code, send_verification_email
-            code = generate_verification_code()
+            code = generate_verification_code()  # hardcoded to 12345 in utils
             send_verification_email(data['email'], code)  # Print to console
             session['reg_email'] = data['email']
             session['reg_code'] = code
@@ -58,17 +42,29 @@ def register():
         elif verification_method == 'phone':
             # Send phone verification code
             from utils import generate_verification_code, send_verification_sms
-            code = generate_verification_code()
+            code = generate_verification_code()  # hardcoded to 12345 in utils
             send_verification_sms(data['phone'], code)  # Print to console
             session['reg_phone'] = data['phone']
             session['reg_code'] = code
             session['reg_method'] = 'phone'
             auth_notifier.notify(f"Registration successful! Verification code: {code}", "success")
             return redirect(url_for('auth.verify_register'))
+        else:
+            # Fallback to email verification if unknown method
+            from utils import generate_verification_code, send_verification_email
+            code = generate_verification_code()
+            email = data.get('email')
+            if email:
+                send_verification_email(email, code)
+                session['reg_email'] = email
+                session['reg_code'] = code
+                session['reg_method'] = 'email'
+                auth_notifier.notify(f"Registration successful! Verification code: {code}", "success")
+                return redirect(url_for('auth.verify_register'))
+            auth_notifier.notify('Verification method not supported and no email provided.', 'danger')
+            return render_template('register_v2.html', role=role)
     # GET request - show registration form
-    captcha = CaptchaFactory.create_captcha()
-    session['reg_captcha_answer'] = captcha['answer']
-    return render_template('register_v2.html', captcha=captcha)
+    return render_template('register_v2.html')
 
 @auth_bp.route('/verify_register', methods=['GET', 'POST'])
 def verify_register():
@@ -114,6 +110,7 @@ def login():
     if request.method == 'POST':
         identifier = request.form.get('identifier')  # Changed name to identifier for clarity
         password = request.form.get('password')
+        login_as = request.form.get('login_as', 'customer')
         user_captcha = request.form.get('captcha_answer')
         correct_answer = session.get('captcha_answer')
         if user_captcha != correct_answer:
@@ -125,16 +122,21 @@ def login():
             login_user(user, remember=False)
             auth_notifier.notify(f"Login successful! Welcome, {user.name}", "success")
             
-            # Role-based redirection (Decorator Pattern used in routes)
-            if hasattr(user, 'role') and user.role == 'business_owner':
-                # Redirect business owners to their dashboard
-                return redirect(url_for('owner_business.dashboard'))
-            elif hasattr(user, 'role') and user.role == 'admin':
-                # Redirect admins to admin dashboard
+            # Role + intent-based redirection (Decorator Pattern used in routes)
+            # Admin takes precedence regardless of selected intent
+            if hasattr(user, 'role') and user.role == 'admin':
                 return redirect(url_for('admin.dashboard'))
-            else:
-                # Regular customers go to home
-                return redirect(url_for('home.index'))
+
+            # If user selected business owner intent
+            if login_as == 'business_owner':
+                if hasattr(user, 'role') and user.role == 'business_owner':
+                    return redirect(url_for('owner_business.dashboard'))
+                else:
+                    auth_notifier.notify('Your account is not a business owner. Redirected to home.', 'warning')
+                    return redirect(url_for('home.index'))
+
+            # Default: customer home
+            return redirect(url_for('home.index'))
         else:
             auth_notifier.notify(error or "Invalid credentials.", "danger")
             return redirect(url_for('auth.login'))

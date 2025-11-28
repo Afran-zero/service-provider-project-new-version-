@@ -20,11 +20,31 @@ def create_business(owner_id=None, data=None, profile_pic=None, gallery_pics=Non
     # Determine an owner key for storage paths (use owner_id if available)
     owner_key = owner_id or data.get('owner_id') or 'no_owner'
 
-    # Upload profile picture if provided
+    # Upload profile picture if provided. Store in user profile if owner exists.
     if profile_pic:
-        folder = f"businesses/{owner_key}"
-        public_id = f"profile_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        profile_pic_url = upload_image_to_cloudinary(profile_pic, folder, public_id)
+        if owner_id:  # Update owner's user profile image
+            try:
+                from models.user import User
+                user = User.objects.get(user_id=owner_id)
+                # Reuse user profile folder for consistency
+                user_folder = "user_profiles"
+                public_id = f"user_{owner_id}_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+                uploaded_url = upload_image_to_cloudinary(profile_pic, user_folder, public_id)
+                if uploaded_url:
+                    user.profile_pic_url = uploaded_url
+                    user.updated_at = datetime.datetime.utcnow()
+                    user.save()
+                    profile_pic_url = uploaded_url  # Mirror to business for direct access
+            except Exception:
+                # Fallback to previous business storage if user update fails
+                folder = f"businesses/{owner_key}"
+                public_id = f"profile_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+                profile_pic_url = upload_image_to_cloudinary(profile_pic, folder, public_id)
+        else:
+            # No owner user, store under businesses
+            folder = f"businesses/{owner_key}"
+            public_id = f"profile_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            profile_pic_url = upload_image_to_cloudinary(profile_pic, folder, public_id)
 
     # Upload gallery images if provided
     if gallery_pics:
@@ -90,6 +110,32 @@ def get_business_details(business_id):
     business = get_business(business_id)
     if not business:
         return None
+    # Determine original profile image: prefer business profile_pic_url, else owner's user profile_pic_url
+    original_url = business.profile_pic_url
+    if not original_url and business.owner_id:
+        try:
+            from models.user import User
+            owner = User.objects.get(user_id=business.owner_id)
+            if getattr(owner, 'profile_pic_url', None):
+                original_url = owner.profile_pic_url
+        except Exception as e:
+            try:
+                print(f"[WARN] Unable to fetch owner profile image for business {business.business_id}: {e}")
+            except Exception:
+                pass
+    if not original_url:
+        try:
+            print(f"[DEBUG] No profile image for business {business.business_id} (neither business nor owner).")
+        except Exception:
+            pass
+
+    # Provide both a lazy placeholder (blurred) and a full-quality URL for progressive loading
+    profile_full = None
+    profile_lazy = None
+    if original_url:
+        # Attempt to build transformed URLs; fall back to original if adapter returns None
+        profile_full = get_cloudinary_url(original_url, width=800, height=800, quality="auto:good") or original_url
+        profile_lazy = get_cloudinary_url(original_url, width=40, height=40, quality="auto:low", lazy=True) or original_url
 
     result = {
         'business_id': business.business_id,
@@ -104,8 +150,9 @@ def get_business_details(business_id):
         'category': business.category,
         'is_active': business.is_active,
         'created_at': business.created_at,
-        'profile_pic_url': business.profile_pic_url,
-        'profile_pic_optimized': get_cloudinary_url(business.profile_pic_url, width=500, height=500) if business.profile_pic_url else None,
+        'profile_pic_url': original_url,  # original stored URL (business or owner)
+        'profile_pic_full': profile_full,
+        'profile_pic_lazy': profile_lazy,
         'profile_pic_thumbnail': get_cloudinary_thumbnail_url(business.profile_pic_url, size=150) if business.profile_pic_url else None,
         'gallery_urls': business.gallery_urls,
         'gallery_thumbnails': [get_cloudinary_thumbnail_url(url, size=200) for url in business.gallery_urls]
@@ -205,6 +252,39 @@ def delete_gallery_image(business_id, gallery_url):
     business.updated_at = datetime.datetime.utcnow()
     business.save()
     return business
+
+
+def add_gallery_images(business_id, gallery_pics):
+    """Add multiple images to an existing business gallery.
+
+    Args:
+        business_id: Target business ID
+        gallery_pics: List of FileStorage objects
+
+    Returns:
+        List of newly added image URLs
+    """
+    business = get_business(business_id)
+    if not business:
+        return []
+    if not gallery_pics:
+        return []
+
+    owner_key = business.owner_id or business.business_id
+    folder = f"businesses/{owner_key}/gallery"
+    new_urls = []
+    for gallery_pic in gallery_pics:
+        if not gallery_pic or not getattr(gallery_pic, 'filename', None):
+            continue
+        public_id = f"gallery_{len(business.gallery_urls) + len(new_urls)}_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        gallery_url = upload_image_to_cloudinary(gallery_pic, folder, public_id)
+        if gallery_url:
+            business.gallery_urls.append(gallery_url)
+            new_urls.append(gallery_url)
+    if new_urls:
+        business.updated_at = datetime.datetime.utcnow()
+        business.save()
+    return new_urls
 
 
 # Service Management Functions

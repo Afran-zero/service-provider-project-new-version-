@@ -57,6 +57,7 @@
                     <thead>
                         <tr>
                             <th>Name</th>
+                            <th>Role</th>
                             <th>Email</th>
                             <th>Phone</th>
                             <th>Location</th>
@@ -69,6 +70,15 @@
                         {% for user in users %}
                         <tr>
                             <td>{{ user.name }}</td>
+                            <td>
+                                {% if user.role == 'business_owner' %}
+                                    <span class="badge bg-info">Business Owner</span>
+                                {% elif user.role == 'customer' %}
+                                    <span class="badge bg-secondary">Customer</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">{{ user.role or 'Unknown' }}</span>
+                                {% endif %}
+                            </td>
                             <td>{{ user.email }}</td>
                             <td>{{ user.phone }}</td>
                             <td>{{ user.city }}, {{ user.district }}</td>

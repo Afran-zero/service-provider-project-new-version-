@@ -7,7 +7,7 @@ from patterns.cloudinary_adapter import get_cloudinary_adapter
 load_dotenv()
 
 # Hardcoded PIN for verification (email/phone)
-HARDCODED_PIN = "123456"
+HARDCODED_PIN = "12345"
 
 # In-memory store for verification (for demo)
 verification_codes = {}

@@ -37,16 +37,12 @@ class CategoryFactory:
     _icon_map = {
         'cleaning': 'brush-fill',
         'plumbing': 'wrench-adjustable-circle-fill',
-        'electric': 'lightning-charge-fill',
+        'electrical': 'lightning-charge-fill',
         'painting': 'palette2',
         'carpentry': 'hammer',
-        'gardening': 'flower2',
+        'landscaping': 'flower2',
         'hvac': 'snow2',
-        'roofing': 'house',
-        'pest_control': 'bug-fill',
-        'appliance_repair': 'tools',
-        'locksmith': 'key-fill',
-        'moving': 'box-seam'
+        'other': 'three-dots'
     }
     
     _categories = {
@@ -64,8 +60,8 @@ class CategoryFactory:
             icon='🔧',
             tags=['pipe repair', 'leak fixing', 'drain cleaning', 'water heater']
         ),
-        'electric': Category(
-            name='electric',
+        'electrical': Category(
+            name='electrical',
             display_name='Electrical Services',
             description='Certified electricians for wiring, repairs, and installations',
             icon='⚡',
@@ -85,10 +81,10 @@ class CategoryFactory:
             icon='🪚',
             tags=['furniture assembly', 'cabinet installation', 'wood repair', 'custom woodwork']
         ),
-        'gardening': Category(
-            name='gardening',
-            display_name='Gardening & Landscaping',
-            description='Expert gardeners for lawn care and landscape design',
+        'landscaping': Category(
+            name='landscaping',
+            display_name='Landscaping',
+            description='Landscape design and lawn care',
             icon='🌱',
             tags=['lawn mowing', 'landscaping', 'tree trimming', 'garden maintenance']
         ),
@@ -99,43 +95,34 @@ class CategoryFactory:
             icon='❄️',
             tags=['ac repair', 'heating', 'ventilation', 'hvac maintenance']
         ),
-        'roofing': Category(
-            name='roofing',
-            display_name='Roofing Services',
-            description='Professional roofers for repairs and installations',
-            icon='🏠',
-            tags=['roof repair', 'roof installation', 'gutter cleaning', 'leak repair']
-        ),
-        'pest_control': Category(
-            name='pest_control',
-            display_name='Pest Control',
-            description='Effective pest elimination and prevention services',
-            icon='🐜',
-            tags=['pest removal', 'termite control', 'rodent control', 'fumigation']
-        ),
-        'appliance_repair': Category(
-            name='appliance_repair',
-            display_name='Appliance Repair',
-            description='Repair services for home and kitchen appliances',
-            icon='🔨',
-            tags=['refrigerator repair', 'washing machine', 'dishwasher', 'oven repair']
-        ),
-        'locksmith': Category(
-            name='locksmith',
-            display_name='Locksmith Services',
-            description='Emergency lockout service and lock installations',
-            icon='🔑',
-            tags=['lock change', 'key duplication', 'emergency lockout', 'security locks']
-        ),
-        'moving': Category(
-            name='moving',
-            display_name='Moving Services',
-            description='Professional movers for residential and commercial relocations',
-            icon='📦',
-            tags=['house moving', 'packing', 'furniture moving', 'storage']
+        'other': Category(
+            name='other',
+            display_name='Other Services',
+            description='Miscellaneous services not listed',
+            icon='⋯',
+            tags=['misc', 'general']
         )
     }
     
+    @staticmethod
+    def _db_categories_map():
+        """Fetch categories from DB and return a mapping name->Category."""
+        try:
+            from models.category import CategoryModel
+            items = CategoryModel.objects()
+            db_map = {}
+            for c in items:
+                db_map[c.name] = Category(
+                    name=c.name,
+                    display_name=c.display_name or c.name,
+                    description=c.description or '',
+                    icon=c.icon or '',
+                    tags=c.tags or []
+                )
+            return db_map
+        except Exception:
+            return {}
+
     @staticmethod
     def get_category(name):
         """
@@ -147,7 +134,8 @@ class CategoryFactory:
         Returns:
             Category object or None
         """
-        return CategoryFactory._categories.get(name)
+        db_map = CategoryFactory._db_categories_map()
+        return db_map.get(name) or CategoryFactory._categories.get(name)
     
     @staticmethod
     def get_all_categories():
@@ -157,7 +145,10 @@ class CategoryFactory:
         Returns:
             List of Category objects
         """
-        return list(CategoryFactory._categories.values())
+        merged = dict(CategoryFactory._categories)
+        db_map = CategoryFactory._db_categories_map()
+        merged.update(db_map)
+        return list(merged.values())
     
     @staticmethod
     def get_categories_dict():
@@ -167,7 +158,9 @@ class CategoryFactory:
         Returns:
             List of category dicts
         """
-        return [cat.to_dict() for cat in CategoryFactory._categories.values()]
+        merged = dict(CategoryFactory._categories)
+        merged.update(CategoryFactory._db_categories_map())
+        return [cat.to_dict() for cat in merged.values()]
     
     @staticmethod
     def search_categories(query):
@@ -183,7 +176,9 @@ class CategoryFactory:
         query_lower = query.lower()
         matches = []
         
-        for category in CategoryFactory._categories.values():
+        merged = dict(CategoryFactory._categories)
+        merged.update(CategoryFactory._db_categories_map())
+        for category in merged.values():
             # Search in name, display_name, description, and tags
             if (query_lower in category.name.lower() or
                 query_lower in category.display_name.lower() or
@@ -204,7 +199,15 @@ class CategoryFactory:
         Returns:
             Boolean indicating validity
         """
-        return name in CategoryFactory._categories
+        if not name:
+            return False
+        if name in CategoryFactory._categories:
+            return True
+        try:
+            from models.category import CategoryModel
+            return CategoryModel.objects(name=name).first() is not None
+        except Exception:
+            return False
     
     @staticmethod
     def get_bootstrap_icon(category_name):
@@ -246,7 +249,9 @@ class CategoryFactory:
         query_lower = partial_query.lower()
         suggestions = []
         
-        for category in CategoryFactory._categories.values():
+        merged = dict(CategoryFactory._categories)
+        merged.update(CategoryFactory._db_categories_map())
+        for category in merged.values():
             if query_lower in category.display_name.lower():
                 suggestions.append({
                     'name': category.name,

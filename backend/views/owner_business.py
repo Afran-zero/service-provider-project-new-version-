@@ -101,7 +101,9 @@ def create_business():
     Uses: BusinessBuilder pattern from controllers
     """
     if request.method == 'GET':
-        return render_template('owner/create_business.html')
+        from patterns.factory_category import CategoryFactory
+        categories = CategoryFactory.get_all_categories()
+        return render_template('owner/create_business.html', categories=categories)
     
     try:
         # Get form data
@@ -180,6 +182,45 @@ def view_business(business_id):
         flash(f'Error loading business: {str(e)}', 'danger')
         logger.error(f"Error viewing business {business_id}: {str(e)}")
         return redirect(url_for('owner_business.dashboard'))
+
+
+@owner_business_bp.route('/business/<business_id>/gallery/add', methods=['POST'])
+@business_owner_required
+def add_gallery(business_id):
+    """Upload additional gallery images for this business (owner only)."""
+    try:
+        business = business_controller.get_business(business_id)
+        if not business or business.owner_id != current_user.user_id:
+            flash('Unauthorized', 'danger')
+            return redirect(url_for('owner_business.view_business', business_id=business_id))
+        gallery_pics = request.files.getlist('gallery_pics')
+        added = business_controller.add_gallery_images(business_id, gallery_pics)
+        if added:
+            flash(f'Added {len(added)} image(s) to gallery.', 'success')
+        else:
+            flash('No images were added.', 'warning')
+    except Exception as e:
+        flash(f'Error adding gallery images: {str(e)}', 'danger')
+    return redirect(url_for('owner_business.view_business', business_id=business_id))
+
+
+@owner_business_bp.route('/business/<business_id>/gallery/delete', methods=['POST'])
+@business_owner_required
+def delete_gallery(business_id):
+    """Delete a gallery image for this business (owner only)."""
+    try:
+        business = business_controller.get_business(business_id)
+        if not business or business.owner_id != current_user.user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        gallery_url = request.form.get('gallery_url') or (request.json.get('gallery_url') if request.is_json else None)
+        if not gallery_url:
+            return jsonify({'error': 'gallery_url required'}), 400
+        updated = business_controller.delete_gallery_image(business_id, gallery_url)
+        if not updated:
+            return jsonify({'error': 'Image not found'}), 404
+        return jsonify({'success': True, 'gallery_url': gallery_url}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @owner_business_bp.route('/bookings', methods=['GET'])

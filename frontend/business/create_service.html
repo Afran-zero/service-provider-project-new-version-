@@ -80,8 +80,8 @@
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-check-circle"></i> Create Service
                             </button>
-                            <a href="{{ url_for('business.list_services', business_id=business.business_id) }}" 
-                               class="btn btn-outline-secondary">
+                                     <a href="{{ url_for('owner_business.view_business', business_id=business.business_id) }}" 
+                                         class="btn btn-outline-secondary">
                                 <i class="bi bi-x-circle"></i> Cancel
                             </a>
                         </div>

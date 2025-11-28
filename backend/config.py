@@ -21,12 +21,23 @@ class Config:
             cls._instance.SECRET_KEY = os.getenv('SECRET_KEY', 'default_secret_key_fallback')  # Use a fallback for dev only
             cls._instance.MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/default_db')
             cls._instance.DB_NAME = os.getenv('DB_NAME', 'default_db_name')
+            # Cloudinary configuration (optional but required for image upload feature)
+            cls._instance.CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
+            cls._instance.CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
+            cls._instance.CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
             
             # Raise error if critical vars are missing (for production safety)
             if not cls._instance.SECRET_KEY or cls._instance.SECRET_KEY == 'default_secret_key_fallback':
                 raise ValueError("SECRET_KEY must be set in .env or environment variables.")
             if not cls._instance.MONGO_URI:
                 raise ValueError("MONGO_URI must be set in .env or environment variables.")
+            # Warn (not raise) if Cloudinary variables missing – image upload will fail gracefully
+            if not all([
+                cls._instance.CLOUDINARY_CLOUD_NAME,
+                cls._instance.CLOUDINARY_API_KEY,
+                cls._instance.CLOUDINARY_API_SECRET
+            ]):
+                print("[WARN] Cloudinary credentials missing; image uploads will fail.")
         return cls._instance
 
     @classmethod

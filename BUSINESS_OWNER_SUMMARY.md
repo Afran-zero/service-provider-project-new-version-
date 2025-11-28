@@ -198,6 +198,9 @@ Includes:
 - Database schema documentation
 - Route structure and details
 - Authentication/authorization flow diagrams
+ - Strategy Pattern for images (fallback to owner; lazy/full)
+ - Public view booking restriction for owners
+ - Owner-focused navigation (Back/Cancel to owner page; hide Home)
 - 7 detailed test scenarios
 - Complete API reference
 - Troubleshooting guide
