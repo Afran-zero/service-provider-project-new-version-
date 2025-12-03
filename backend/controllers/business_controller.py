@@ -1,32 +1,33 @@
 # controllers/business_controller.py
 from models.business import Business, Service
 from utils import upload_image_to_cloudinary, delete_image_from_cloudinary, get_cloudinary_url, get_cloudinary_thumbnail_url
+from patterns.builder_business import BusinessBuilder
+from patterns.factory_business import BusinessFactory
+from patterns.factory_service import ServiceFactory
 import datetime
 
 
 def create_business(owner_id=None, data=None, profile_pic=None, gallery_pics=None, services=None):
-    """Create a new business with profile picture and gallery.
-
-    owner_id is optional; if not provided the business will be created
-    without a linked user account. You may also pass `owner_name` inside
-    `data` for non-user owners.
+    """
+    Create a new business using Builder Pattern with Factory defaults.
+    
+    Design Pattern: Builder Pattern
+    - Provides step-by-step construction with validation
+    - Uses Factory for category-specific defaults
     """
     if data is None:
         data = {}
 
     profile_pic_url = None
     gallery_urls = []
-
-    # Determine an owner key for storage paths (use owner_id if available)
     owner_key = owner_id or data.get('owner_id') or 'no_owner'
 
-    # Upload profile picture if provided. Store in user profile if owner exists.
+    # Upload profile picture
     if profile_pic:
-        if owner_id:  # Update owner's user profile image
+        if owner_id:
             try:
                 from models.user import User
                 user = User.objects.get(user_id=owner_id)
-                # Reuse user profile folder for consistency
                 user_folder = "user_profiles"
                 public_id = f"user_{owner_id}_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
                 uploaded_url = upload_image_to_cloudinary(profile_pic, user_folder, public_id)
@@ -34,19 +35,17 @@ def create_business(owner_id=None, data=None, profile_pic=None, gallery_pics=Non
                     user.profile_pic_url = uploaded_url
                     user.updated_at = datetime.datetime.utcnow()
                     user.save()
-                    profile_pic_url = uploaded_url  # Mirror to business for direct access
+                    profile_pic_url = uploaded_url
             except Exception:
-                # Fallback to previous business storage if user update fails
                 folder = f"businesses/{owner_key}"
                 public_id = f"profile_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
                 profile_pic_url = upload_image_to_cloudinary(profile_pic, folder, public_id)
         else:
-            # No owner user, store under businesses
             folder = f"businesses/{owner_key}"
             public_id = f"profile_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
             profile_pic_url = upload_image_to_cloudinary(profile_pic, folder, public_id)
 
-    # Upload gallery images if provided
+    # Upload gallery images
     if gallery_pics:
         folder = f"businesses/{owner_key}/gallery"
         for idx, gallery_pic in enumerate(gallery_pics):
@@ -55,45 +54,82 @@ def create_business(owner_id=None, data=None, profile_pic=None, gallery_pics=Non
             if gallery_url:
                 gallery_urls.append(gallery_url)
 
-    business = Business(
-        owner_id=owner_id or data.get('owner_id'),
-        owner_name=data.get('owner_name'),
-        name=data['name'],
-        email=data['email'],
-        phone=data['phone'],
-        street_house=data['street_house'],
-        city=data['city'],
-        district=data['district'],
-        description=data.get('description', ''),
-        profile_pic_url=profile_pic_url,
-        gallery_urls=gallery_urls,
-        category=data['category']
-    )
-    business.save()
-
-    # If services were provided as a list of dicts, create Service documents
-    if services and isinstance(services, list):
-        for svc in services:
-            try:
-                name = svc.get('name')
-                if not name:
+    # ===== BUILDER PATTERN IMPLEMENTATION =====
+    try:
+        builder = BusinessBuilder()
+        
+        # Set owner information
+        if owner_id:
+            builder.set_owner_id(owner_id)
+        if data.get('owner_name'):
+            builder.set_owner_name(data['owner_name'])
+        
+        # Set required fields (validates each field)
+        builder.set_name(data['name'])
+        builder.set_email(data['email'])
+        builder.set_phone(data['phone'])
+        builder.set_street_house(data['street_house'])
+        builder.set_city(data['city'])
+        builder.set_district(data['district'])
+        builder.set_category(data['category'])
+        
+        # Set description (use Factory default if not provided)
+        if data.get('description'):
+            builder.set_description(data['description'])
+        else:
+            business_type_class = BusinessFactory._business_types.get(data['category'])
+            if business_type_class:
+                default_desc = business_type_class(None, {}).get_default_description()
+                builder.set_description(default_desc)
+        
+        # Set uploaded media
+        if profile_pic_url:
+            builder.set_profile_pic_url(profile_pic_url)
+        if gallery_urls:
+            builder.set_gallery_urls(gallery_urls)
+        
+        # Build and save business
+        business = builder.build_and_save()
+        
+        # Create services (use provided or Factory defaults)
+        if services and isinstance(services, list):
+            for svc in services:
+                try:
+                    name = svc.get('name')
+                    if not name:
+                        continue
+                    service_obj = Service(
+                        business_id=business.business_id,
+                        name=name,
+                        description=svc.get('description'),
+                        price=float(svc.get('price', 0.0) or 0.0),
+                        duration_minutes=int(svc.get('duration_minutes', svc.get('duration', 60) or 60))
+                    )
+                    service_obj.save()
+                except Exception:
                     continue
-                price = float(svc.get('price', 0.0) or 0.0)
-                duration = int(svc.get('duration_minutes', svc.get('duration', 60) or 60))
-                description = svc.get('description')
-                service_obj = Service(
-                    business_id=business.business_id,
-                    name=name,
-                    description=description,
-                    price=price,
-                    duration_minutes=duration
-                )
-                service_obj.save()
-            except Exception:
-                # skip faulty service entries
-                continue
-
-    return business
+        else:
+            # Use Factory to get default services for category
+            default_services = BusinessFactory.get_default_services(data['category'])
+            for svc in default_services:
+                try:
+                    service_obj = Service(
+                        business_id=business.business_id,
+                        name=svc['name'],
+                        description=svc.get('description'),
+                        price=svc['price'],
+                        duration_minutes=svc['duration_minutes']
+                    )
+                    service_obj.save()
+                except Exception:
+                    continue
+        
+        return business
+        
+    except ValueError as e:
+        raise ValueError(f"Business validation failed: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Failed to create business: {str(e)}")
 
 
 def get_business(business_id):
@@ -289,16 +325,33 @@ def add_gallery_images(business_id, gallery_pics):
 
 # Service Management Functions
 def create_service(business_id, data):
-    """Create a new service for a business"""
-    service = Service(
-        business_id=business_id,
-        name=data['name'],
-        description=data.get('description', ''),
-        price=data['price'],
-        duration_minutes=data.get('duration_minutes', 60)
-    )
-    service.save()
-    return service
+    """
+    Create a new service using Factory Pattern.
+    
+    Design Pattern: Factory Pattern
+    - Creates services with category-specific defaults
+    - Validates price ranges and duration
+    - Applies appropriate templates
+    """
+    # Get business to determine category
+    business = get_business(business_id)
+    if not business:
+        raise ValueError("Business not found")
+    
+    # ===== FACTORY PATTERN IMPLEMENTATION =====
+    try:
+        # Use ServiceFactory to create service with category-specific defaults
+        service = ServiceFactory.create_service(
+            business_id=business_id,
+            category=business.category,
+            data=data
+        )
+        service.save()
+        return service
+    except ValueError as e:
+        raise ValueError(f"Service validation failed: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Failed to create service: {str(e)}")
 
 
 def get_service(service_id):

@@ -3,9 +3,16 @@
 Observer Pattern Implementation for Booking Notifications
 
 This module implements the Observer pattern to notify users about booking status changes.
-Observers (EmailNotifier, SMSNotifier) are notified when bookings change state.
+Observers (EmailNotifier, SMSNotifier, BusinessNotifier) are notified when bookings change state.
+
+Design Pattern: Observer
+- Subject: BookingNotificationSubject (manages observers and notifies them)
+- Observers: EmailNotifier, SMSNotifier, BusinessNotifier
+- Event: Booking status changes (requested, accepted, rejected, cancelled, completed)
 """
 
+from abc import ABC, abstractmethod
+from typing import List
 from mongoengine import signals
 from models.booking import Booking
 from models.business import Business
@@ -16,12 +23,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class BookingObserver:
+# ============================================
+# Observer Interface
+# ============================================
+class BookingObserver(ABC):
     """Abstract base class for booking observers"""
     
-    def update(self, booking, status):
+    @abstractmethod
+    def update(self, booking, status: str) -> None:
         """Override this method in concrete observers"""
-        raise NotImplementedError("Subclasses must implement update()")
+        pass
+
+
+# ============================================
+# Concrete Observers
+# ============================================
 
 
 class EmailNotifier(BookingObserver):
@@ -115,33 +131,78 @@ class BusinessNotifier(BookingObserver):
             logger.error(f"Failed to notify business: {str(e)}")
 
 
-# Registry of active observers
-_observers = [
-    EmailNotifier(),
-    SMSNotifier(),
-    BusinessNotifier()
-]
-
-
-def notify_booking_status_change(booking, status):
-    """Notify all registered observers about booking status change"""
-    for observer in _observers:
+# ============================================
+# Subject (Observable) for Booking Events
+# ============================================
+class BookingNotificationSubject:
+    """Subject that manages booking observers and notifies them of status changes"""
+    
+    def __init__(self):
+        self._observers: List[BookingObserver] = []
+        logger.debug("BookingNotificationSubject initialized")
+    
+    def attach(self, observer: BookingObserver) -> None:
+        """Attach an observer to receive notifications"""
+        if observer not in self._observers:
+            self._observers.append(observer)
+            logger.debug(f"Booking observer {observer.__class__.__name__} attached")
+        else:
+            logger.warning(f"Booking observer {observer.__class__.__name__} already attached")
+    
+    def detach(self, observer: BookingObserver) -> None:
+        """Detach an observer from receiving notifications"""
         try:
-            observer.update(booking, status)
-        except Exception as e:
-            logger.error(f"Observer {observer.__class__.__name__} failed: {str(e)}")
+            self._observers.remove(observer)
+            logger.debug(f"Booking observer {observer.__class__.__name__} detached")
+        except ValueError:
+            logger.warning(f"Booking observer {observer.__class__.__name__} not found")
+    
+    def notify(self, booking, status: str) -> None:
+        """Notify all attached observers about booking status change"""
+        logger.debug(f"Notifying {len(self._observers)} observers: Booking {booking.booking_id} -> {status}")
+        
+        for observer in self._observers:
+            try:
+                observer.update(booking, status)
+            except Exception as e:
+                logger.error(f"Observer {observer.__class__.__name__} failed: {str(e)}")
+    
+    def get_observers(self) -> List[BookingObserver]:
+        """Get list of attached observers"""
+        return self._observers.copy()
+    
+    def observer_count(self) -> int:
+        """Get number of attached observers"""
+        return len(self._observers)
 
 
-def register_observer(observer):
+# ============================================
+# Singleton Instance
+# ============================================
+booking_notifier = BookingNotificationSubject()
+
+# Attach default observers
+booking_notifier.attach(EmailNotifier())
+booking_notifier.attach(SMSNotifier())
+booking_notifier.attach(BusinessNotifier())
+
+
+# ============================================
+# Convenience Functions (Backward Compatibility)
+# ============================================
+def notify_booking_status_change(booking, status: str) -> None:
+    """Notify all registered observers about booking status change"""
+    booking_notifier.notify(booking, status)
+
+
+def register_observer(observer: BookingObserver) -> None:
     """Register a new observer to receive booking notifications"""
-    if observer not in _observers:
-        _observers.append(observer)
+    booking_notifier.attach(observer)
 
 
-def unregister_observer(observer):
+def unregister_observer(observer: BookingObserver) -> None:
     """Unregister an observer from receiving notifications"""
-    if observer in _observers:
-        _observers.remove(observer)
+    booking_notifier.detach(observer)
 
 
 # MongoEngine signal handlers (alternative approach)

@@ -1,0 +1,527 @@
+/* 
+ * Custom Theme Override for Bootstrap Components
+ * Deep Forest Green Aesthetic with Pure White Background
+ */
+
+/* Import Modern Sans-serif Font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* ============================================
+   CSS Variables - Color Palette
+   ============================================ */
+:root {
+    --primary-green: #00704A;
+    --primary-green-hover: #005A3C;
+    --primary-green-active: #004A30;
+    --pure-white: #FFFFFF;
+    --text-dark: #212529;
+    --text-secondary: #6c757d;
+    --light-gray: #f8f9fa;
+    --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.06);
+    --border-radius: 8px;
+}
+
+/* ============================================
+   Global Styles
+   ============================================ */
+body {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--pure-white);
+    color: var(--text-dark);
+}
+
+/* ============================================
+   Primary Buttons
+   ============================================ */
+.btn-primary {
+    background-color: var(--primary-green) !important;
+    border-color: var(--primary-green) !important;
+    color: var(--pure-white) !important;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-subtle);
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-green-hover) !important;
+    border-color: var(--primary-green-hover) !important;
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px);
+}
+
+.btn-primary:active,
+.btn-primary:focus,
+.btn-primary.active {
+    background-color: var(--primary-green-active) !important;
+    border-color: var(--primary-green-active) !important;
+    box-shadow: var(--shadow-hover);
+}
+
+.btn-primary:disabled {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    opacity: 0.6;
+}
+
+/* ============================================
+   Other Button Variants with Soft Radius
+   ============================================ */
+.btn {
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-subtle);
+}
+
+.btn-outline-primary {
+    color: var(--primary-green) !important;
+    border-color: var(--primary-green) !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-green) !important;
+    border-color: var(--primary-green) !important;
+    color: var(--pure-white) !important;
+}
+
+/* ============================================
+   Cards & Containers
+   ============================================ */
+.card {
+    background-color: var(--pure-white);
+    border: none !important;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-hover);
+}
+
+.card-header {
+    background-color: var(--pure-white);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+    font-weight: 600;
+}
+
+.card-footer {
+    background-color: var(--light-gray);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0 0 var(--border-radius) var(--border-radius) !important;
+}
+
+/* ============================================
+   Navigation Bar
+   ============================================ */
+.navbar {
+    background-color: var(--pure-white) !important;
+    box-shadow: var(--shadow-subtle);
+    transition: box-shadow 0.3s ease;
+}
+
+.navbar-light .navbar-brand,
+.navbar-light .navbar-nav .nav-link {
+    color: var(--text-dark) !important;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.navbar-light .navbar-nav .nav-link:hover {
+    color: var(--primary-green) !important;
+}
+
+.navbar-light .navbar-nav .nav-link.active,
+.navbar-light .navbar-nav .show > .nav-link {
+    color: var(--primary-green) !important;
+    font-weight: 600;
+}
+
+.navbar-toggler {
+    border-color: var(--primary-green);
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%2300704A' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+/* ============================================
+   Links
+   ============================================ */
+a {
+    color: var(--primary-green);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: var(--primary-green-hover);
+    text-decoration: underline;
+}
+
+a:active {
+    color: var(--primary-green-active);
+}
+
+/* ============================================
+   Forms & Inputs
+   ============================================ */
+.form-control,
+.form-select {
+    border-radius: var(--border-radius);
+    border: 1px solid #dee2e6;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 0.2rem rgba(0, 112, 74, 0.15);
+}
+
+.form-check-input:checked {
+    background-color: var(--primary-green);
+    border-color: var(--primary-green);
+}
+
+/* ============================================
+   Badges
+   ============================================ */
+.badge {
+    border-radius: calc(var(--border-radius) / 2);
+    font-weight: 500;
+}
+
+.badge-primary,
+.bg-primary {
+    background-color: var(--primary-green) !important;
+}
+
+/* ============================================
+   Alerts
+   ============================================ */
+.alert {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-subtle);
+}
+
+.alert-primary {
+    background-color: rgba(0, 112, 74, 0.1);
+    color: var(--primary-green-active);
+    border-left: 4px solid var(--primary-green);
+}
+
+/* ============================================
+   Modals
+   ============================================ */
+.modal-content {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
+
+/* ============================================
+   Dropdowns
+   ============================================ */
+.dropdown-menu {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-hover);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: rgba(0, 112, 74, 0.08);
+    color: var(--primary-green);
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: var(--primary-green);
+    color: var(--pure-white);
+}
+
+/* ============================================
+   Pagination
+   ============================================ */
+.pagination .page-link {
+    color: var(--primary-green);
+    border-radius: var(--border-radius);
+    margin: 0 2px;
+    transition: all 0.3s ease;
+}
+
+.pagination .page-link:hover {
+    background-color: rgba(0, 112, 74, 0.1);
+    border-color: var(--primary-green);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--primary-green);
+    border-color: var(--primary-green);
+    color: var(--pure-white);
+}
+
+/* ============================================
+   Tables
+   ============================================ */
+.table {
+    background-color: var(--pure-white);
+}
+
+.table thead th {
+    border-bottom: 2px solid rgba(0, 112, 74, 0.2);
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 112, 74, 0.04);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* ============================================
+   Progress Bars
+   ============================================ */
+.progress {
+    background-color: var(--light-gray);
+    border-radius: var(--border-radius);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.progress-bar {
+    background-color: var(--primary-green);
+}
+
+/* ============================================
+   Breadcrumbs
+   ============================================ */
+.breadcrumb {
+    background-color: transparent;
+    border-radius: var(--border-radius);
+}
+
+.breadcrumb-item.active {
+    color: var(--primary-green);
+    font-weight: 500;
+}
+
+.breadcrumb-item a {
+    color: var(--text-secondary);
+}
+
+.breadcrumb-item a:hover {
+    color: var(--primary-green);
+}
+
+/* ============================================
+   List Groups
+   ============================================ */
+.list-group {
+    border-radius: var(--border-radius);
+}
+
+.list-group-item {
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.list-group-item:hover {
+    background-color: rgba(0, 112, 74, 0.04);
+}
+
+.list-group-item.active {
+    background-color: var(--primary-green);
+    border-color: var(--primary-green);
+    color: var(--pure-white);
+}
+
+.list-group-item:first-child {
+    border-top-left-radius: var(--border-radius);
+    border-top-right-radius: var(--border-radius);
+}
+
+.list-group-item:last-child {
+    border-bottom-left-radius: var(--border-radius);
+    border-bottom-right-radius: var(--border-radius);
+}
+
+/* ============================================
+   Tooltips & Popovers
+   ============================================ */
+.tooltip-inner {
+    background-color: var(--primary-green);
+    border-radius: calc(var(--border-radius) / 2);
+}
+
+.popover {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-hover);
+}
+
+/* ============================================
+   Spinners with Primary Color
+   ============================================ */
+.spinner-border-primary,
+.spinner-grow-primary {
+    color: var(--primary-green);
+}
+
+/* ============================================
+   Text Colors
+   ============================================ */
+.text-primary {
+    color: var(--primary-green) !important;
+}
+
+.text-muted {
+    color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   Background Colors
+   ============================================ */
+.bg-primary {
+    background-color: var(--primary-green) !important;
+}
+
+.bg-light {
+    background-color: var(--light-gray) !important;
+}
+
+/* ============================================
+   Border Colors
+   ============================================ */
+.border-primary {
+    border-color: var(--primary-green) !important;
+}
+
+/* ============================================
+   Accordion
+   ============================================ */
+.accordion-button {
+    background-color: var(--pure-white);
+    color: var(--text-dark);
+    border-radius: var(--border-radius);
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: rgba(0, 112, 74, 0.08);
+    color: var(--primary-green);
+    font-weight: 600;
+}
+
+.accordion-button:focus {
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 0.2rem rgba(0, 112, 74, 0.15);
+}
+
+.accordion-item {
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: var(--border-radius);
+    margin-bottom: 8px;
+}
+
+/* ============================================
+   Tabs
+   ============================================ */
+.nav-tabs .nav-link {
+    color: var(--text-secondary);
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--primary-green);
+    border-bottom-color: rgba(0, 112, 74, 0.3);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-green);
+    border-bottom-color: var(--primary-green);
+    font-weight: 600;
+    background-color: transparent;
+}
+
+/* ============================================
+   Pills
+   ============================================ */
+.nav-pills .nav-link {
+    border-radius: var(--border-radius);
+    transition: all 0.3s ease;
+}
+
+.nav-pills .nav-link:hover {
+    background-color: rgba(0, 112, 74, 0.08);
+    color: var(--primary-green);
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--primary-green);
+    color: var(--pure-white);
+}
+
+/* ============================================
+   Offcanvas
+   ============================================ */
+.offcanvas {
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+}
+
+.offcanvas-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================
+   Toast
+   ============================================ */
+.toast {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-hover);
+}
+
+.toast-header {
+    background-color: var(--pure-white);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    color: var(--text-dark);
+}
+
+/* ============================================
+   Custom Utilities
+   ============================================ */
+.shadow-custom {
+    box-shadow: var(--shadow-card) !important;
+}
+
+.shadow-custom-hover {
+    box-shadow: var(--shadow-hover) !important;
+}
+
+.rounded-custom {
+    border-radius: var(--border-radius) !important;
+}

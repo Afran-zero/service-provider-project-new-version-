@@ -256,7 +256,8 @@ def update_service(service_id):
             'name': request.form.get('name'),
             'description': request.form.get('description'),
             'price': float(request.form.get('price')),
-            'duration_minutes': int(request.form.get('duration_minutes'))
+            'duration_minutes': int(request.form.get('duration_minutes')),
+            'is_active': 'is_active' in request.form  # Checkbox is present only when checked
         }
         
         business_controller.update_service(service_id, data)
