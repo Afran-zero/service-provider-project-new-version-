@@ -40,18 +40,20 @@ class BookingObserver(ABC):
 # ============================================
 
 
+import utils
+
 class EmailNotifier(BookingObserver):
     """Observer that sends email notifications for booking status changes"""
-    
+
     def update(self, booking, status):
         """Send email notification based on booking status"""
         try:
             # Get customer and business details
             customer = User.objects.get(user_id=booking.customer_id)
             business = Business.objects.get(business_id=booking.business_id)
-            
+
             subject = f"Booking {status.capitalize()}"
-            
+
             # Create status-specific messages
             messages = {
                 'requested': f"Your booking request at {business.name} has been submitted.",
@@ -60,15 +62,23 @@ class EmailNotifier(BookingObserver):
                 'cancelled': f"Your booking at {business.name} has been cancelled.",
                 'completed': f"Thank you! Your service at {business.name} is complete."
             }
-            
+
             message = messages.get(status, f"Booking status updated to {status}")
-            
-            # In production, send actual email using utils.send_email
-            logger.info(f"[EMAIL] To: {customer.email}, Subject: {subject}, Message: {message}")
-            
-            # For development, use flash messages
-            flash(f"Email notification: {message}", "info")
-            
+
+            # Use the email adapter to send real email
+            try:
+                mail = utils._get_mail_adapter()
+                from flask_mail import Message
+                msg = Message(
+                    subject=subject,
+                    recipients=[customer.email],
+                    body=message
+                )
+                mail.send(msg)
+                logger.info(f"[EMAIL SENT] To: {customer.email}, Subject: {subject}, Message: {message}")
+            except Exception as e:
+                logger.error(f"[EMAIL ERROR] Could not send booking notification: {str(e)}")
+
         except Exception as e:
             logger.error(f"Failed to send email notification: {str(e)}")
 
@@ -97,8 +107,7 @@ class SMSNotifier(BookingObserver):
             # In production, integrate with SMS gateway (Twilio, etc.)
             logger.info(f"[SMS] To: {customer.phone}, Message: {message}")
             
-            # For development, use flash messages
-            flash(f"SMS notification: {message}", "info")
+            # Note: flash() removed as it can cause issues outside request context
             
         except Exception as e:
             logger.error(f"Failed to send SMS notification: {str(e)}")

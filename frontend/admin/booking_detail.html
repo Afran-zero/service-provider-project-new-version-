@@ -25,7 +25,6 @@
             <a class="nav-link active" href="/admin/bookings"><i class="bi bi-calendar-check"></i> Bookings</a>
             <a class="nav-link" href="/admin/categories"><i class="bi bi-grid"></i> Categories</a>
             <hr class="text-white">
-            <a class="nav-link" href="/"><i class="bi bi-house"></i> View Site</a>
             <a class="nav-link" href="/admin/logout"><i class="bi bi-box-arrow-right"></i> Logout</a>
         </nav>
     </div>
@@ -61,6 +60,14 @@
                         </span>
                     </p>
                     <p><strong>Created:</strong> {{ booking.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    <p><strong>Payment:</strong>
+                        {% if booking.payment_received %}
+                            <span class="badge bg-success">Received</span>
+                            <small class="text-muted"> at {{ booking.payment_received_at }} by {{ booking.payment_received_by[:8] }}</small>
+                        {% else %}
+                            <span class="badge bg-secondary">Not received</span>
+                        {% endif %}
+                    </p>
                     
                     <hr>
                     <h6>Update Status (Admin)</h6>

@@ -25,7 +25,6 @@
             <a class="nav-link active" href="/admin/bookings"><i class="bi bi-calendar-check"></i> Bookings</a>
             <a class="nav-link" href="/admin/categories"><i class="bi bi-grid"></i> Categories</a>
             <hr class="text-white">
-            <a class="nav-link" href="/"><i class="bi bi-house"></i> View Site</a>
             <a class="nav-link" href="/admin/logout"><i class="bi bi-box-arrow-right"></i> Logout</a>
         </nav>
     </div>
@@ -61,6 +60,7 @@
                             <th>Business</th>
                             <th>Date & Time</th>
                             <th>Status</th>
+                            <th>Payment</th>
                             <th>Created</th>
                             <th>Actions</th>
                         </tr>
@@ -92,6 +92,14 @@
                                 <span class="badge bg-{{ 'warning' if booking.status == 'pending' else 'info' if booking.status == 'accepted' else 'success' if booking.status == 'completed' else 'danger' }}">
                                     {{ booking.status|upper }}
                                 </span>
+                            </td>
+                            <td>
+                                {% if booking.payment_received %}
+                                    <span class="badge bg-success">Received</span>
+                                    <div class="text-muted small">By: {{ booking.payment_received_by[:8] if booking.payment_received_by else '' }}</div>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not received</span>
+                                {% endif %}
                             </td>
                             <td>{{ booking.created_at.strftime('%Y-%m-%d') }}</td>
                             <td>

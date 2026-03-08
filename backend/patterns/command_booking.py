@@ -52,13 +52,14 @@ class BookingCommand(ABC):
 class CreateBookingCommand(BookingCommand):
     """Command to create a new booking"""
     
-    def __init__(self, customer_id, service_id, booking_time, staff_id=None, notes=None):
+    def __init__(self, customer_id, service_id, booking_time, staff_id=None, notes=None, payment_method='cash'):
         super().__init__()
         self.customer_id = customer_id
         self.service_id = service_id
         self.booking_time = booking_time
         self.staff_id = staff_id
         self.notes = notes
+        self.payment_method = payment_method
         self.booking = None
     
     def execute(self):
@@ -93,6 +94,7 @@ class CreateBookingCommand(BookingCommand):
                 duration_minutes=service.duration_minutes,
                 price=service.price,
                 notes=self.notes,
+                payment_method=self.payment_method,
                 status='requested',
                 timestamps={'requested_at': datetime.datetime.utcnow()}
             )
@@ -245,29 +247,43 @@ class RejectBookingCommand(BookingCommand):
     def execute(self):
         """Reject the booking"""
         try:
+            logger.info(f"RejectBookingCommand.execute() START for booking {self.booking_id}")
+            
+            logger.info(f"  1. Fetching booking {self.booking_id}")
             self.booking = Booking.objects.get(booking_id=self.booking_id)
+            logger.info(f"  ✓ Booking fetched: status={self.booking.status}, business={self.booking.business_id}")
             
             # Verify business ownership (Decorator Pattern applied in views, but double-check here)
+            logger.info(f"  2. Fetching business {self.booking.business_id}")
             business = Business.objects.get(business_id=self.booking.business_id)
+            logger.info(f"  ✓ Business fetched: owner={business.owner_id}, current_user={self.business_owner_id}")
+            
             if business.owner_id != self.business_owner_id:
                 raise ValueError(
                     f"Unauthorized: User {self.business_owner_id} is not the owner of business {business.business_id}"
                 )
             
+            logger.info(f"  3. Checking booking status: {self.booking.status}")
             if self.booking.status != 'requested':
                 raise ValueError(f"Cannot reject booking with status: {self.booking.status}")
             
+            logger.info(f"  4. Updating booking status to 'rejected'")
             self.booking.update_status('rejected')
+            logger.info(f"  ✓ Status updated")
             
             # Notify observers
+            logger.info(f"  5. Notifying observers")
             notify_booking_status_change(self.booking, 'rejected')
+            logger.info(f"  ✓ Observers notified")
             
             self.log_execution(success=True)
+            logger.info(f"RejectBookingCommand.execute() SUCCESS")
             return self.booking
             
         except Exception as e:
             self.error = str(e)
             self.log_execution(success=False)
+            logger.error(f"RejectBookingCommand.execute() FAILED: {str(e)}", exc_info=True)
             raise
     
     def undo(self):
@@ -283,14 +299,6 @@ class RejectBookingCommand(BookingCommand):
     def get_description(self):
         reason_str = f" (Reason: {self.reason})" if self.reason else ""
         return f"Reject booking {self.booking_id} by owner {self.business_owner_id}{reason_str}"
-    
-    def undo(self):
-        """Cannot undo rejection (terminal state)"""
-        raise ValueError("Cannot undo rejection - terminal state")
-    
-    def get_description(self):
-        reason_str = f" (Reason: {self.reason})" if self.reason else ""
-        return f"Reject booking {self.booking_id}{reason_str}"
 
 
 class CompleteBookingCommand(BookingCommand):

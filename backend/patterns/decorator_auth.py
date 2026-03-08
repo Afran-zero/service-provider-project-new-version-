@@ -1,4 +1,4 @@
-from flask import redirect, url_for, flash
+from flask import redirect, url_for, flash, request, jsonify
 from flask_login import current_user, LoginManager
 from functools import wraps
 
@@ -34,11 +34,15 @@ def business_owner_required(f):
     @wraps(f)
     def decorated_view(*args, **kwargs):
         if not current_user.is_authenticated:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'error': 'Authentication required', 'redirect_url': url_for('auth.login')}), 401
             flash("Please log in first.", "warning")
             return redirect(url_for('auth.login'))
         
         # Check if user has business_owner role
         if not hasattr(current_user, 'role') or current_user.role != 'business_owner':
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
             flash("Access denied. Only business owners can access this page.", "danger")
             return redirect(url_for('home.index'))
         

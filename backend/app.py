@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_login import LoginManager, current_user, logout_user
 from flask import session, request, redirect, url_for
+from flask_mail import Mail
 import uuid
 from config import Config
 from database.singleton_db import SingletonDB
@@ -50,6 +51,71 @@ def load_user(user_id):
         return User.objects.get(user_id=user_id)
     except User.DoesNotExist:
         return None
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Handle unauthorized access requests"""
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from flask import jsonify
+        return jsonify({'success': False, 'error': 'Unauthorized', 'message': 'Please log in to continue.'}), 401
+    return redirect(url_for('auth.login', next=request.path))
+
+# Initialize Flask-Mail extension so it is available via current_app.extensions['mail']
+try:
+    mail = Mail(app)
+except Exception:
+    # If initialization fails (e.g., missing config), we continue; utils will handle runtime errors
+    mail = None
+
+
+@app.route('/send-test-email')
+def send_test_email():
+    """Send a simple test email to verify SMTP configuration.
+
+    Query params:
+      - to: recipient email address (optional; defaults to MAIL_DEFAULT_SENDER or MAIL_USERNAME)
+
+    Returns JSON {success: bool, message: str}
+    """
+    from flask import request, jsonify, current_app
+    try:
+        # Prefer the Mail() instance initialized at app start; otherwise create a temporary Mail wrapper
+        mail_instance = None
+        try:
+            if 'mail' in globals() and globals().get('mail') is not None:
+                mail_instance = globals().get('mail')
+            else:
+                mail_instance = Mail(current_app)
+        except Exception:
+            mail_instance = None
+
+        if not mail_instance:
+            return jsonify(success=False, message='Mail extension not initialized'), 500
+
+        to = request.args.get('to') or current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('MAIL_USERNAME')
+        if not to:
+            return jsonify(success=False, message='No recipient configured (pass ?to= or set MAIL_DEFAULT_SENDER)'), 400
+
+        from flask_mail import Message
+        msg = Message(
+            subject='ServiceProvider - SMTP Test',
+            recipients=[to],
+            body='This is a test email sent from the ServiceProvider application to verify SMTP settings.'
+        )
+        # Try Flask-Mail first, but fall back to direct SMTP sender in utils
+        try:
+            mail_instance.send(msg)
+        except Exception:
+            # Fallback: use direct smtplib sender
+            try:
+                import utils
+                utils.send_email_smtp(to, msg.subject, msg.body, sender=msg.sender)
+            except Exception as e:
+                return jsonify(success=False, message=f'Error sending email: {str(e)}'), 500
+        return jsonify(success=True, message=f'Test email sent to {to}')
+
+    except Exception as e:
+        return jsonify(success=False, message=f'Error sending email: {str(e)}'), 500
 
 # Initialize DB (Singleton)
 db = SingletonDB()

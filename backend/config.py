@@ -50,8 +50,10 @@ class Config:
             if Config._initialized:
                 return
             
-            # Load .env file
-            load_dotenv()
+            # Load .env file from project root (one level above backend)
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            dotenv_path = os.path.join(base_dir, '.env')
+            load_dotenv(dotenv_path)
             
             # Set config values from environment variables
             self.SECRET_KEY = os.getenv('SECRET_KEY', 'default_secret_key_fallback')
@@ -62,6 +64,16 @@ class Config:
             self.CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
             self.CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
             self.CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
+
+            # Email (Flask-Mail) configuration (optional)
+            self.MAIL_SERVER = os.getenv('MAIL_SERVER')
+            self.MAIL_PORT = int(os.getenv('MAIL_PORT')) if os.getenv('MAIL_PORT') else None
+            # Flask-Mail uses MAIL_USE_TLS and/or MAIL_USE_SSL
+            self.MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'False').lower() in ('1', 'true', 'yes')
+            self.MAIL_USE_SSL = os.getenv('MAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
+            self.MAIL_USERNAME = os.getenv('MAIL_USERNAME') or os.getenv('MAIL_USER') or os.getenv('MAIL_USERNAME')
+            self.MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
+            self.MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER')
             
             # Validate critical configuration
             if not self.SECRET_KEY or self.SECRET_KEY == 'default_secret_key_fallback':

@@ -62,9 +62,21 @@ def send_forgot_password_email(email):
     user = User.objects(email=email).first()
     if not user:
         return None
-    code = "123456"  # Hardcoded as per instructions
-    # send_verification_email(email, code)  # Commented out for now
-    return code
+    # Generate or send a verification code using utils helper (returns the code)
+    try:
+        code = send_verification_email(email)
+        return code
+    except Exception:
+        # Fall back to generating a code and logging if email fails
+        try:
+            code = generate_verification_code()
+            # store the code in-memory so reset flow can validate (send not attempted)
+            from utils import verification_codes
+            verification_codes[email] = code
+        except Exception:
+            code = None
+        print(f"[WARN] Failed to send forgot-password email to {email}")
+        return code
 
 # Reset password
 def reset_password(email, code_entered, real_code, new_password):

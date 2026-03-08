@@ -29,6 +29,17 @@ class Booking(me.Document):
         choices=BOOKING_STATUSES
     )
 
+    payment_method = me.StringField(
+        required=True,
+        default='cash',
+        choices=('cash', 'online')
+    )
+
+    # Payment prototype fields
+    payment_received = me.BooleanField(default=False)
+    payment_received_at = me.DateTimeField(default=None)
+    payment_received_by = me.StringField(default=None)
+
     notes = me.StringField(default=None)  # Optional customer notes/special requirements
 
     # State transition timestamps

@@ -1,0 +1,52 @@
+@startuml
+' Class diagram for core models and DB
+package Models {
+  class User {
+    +String user_id
+    +String name
+    +String email
+    +String phone
+    +String role
+    +bool is_active
+  }
+
+  class Business {
+    +String business_id
+    +String owner_id
+    +String name
+    +bool is_active
+  }
+
+  class Booking {
+    +String booking_id
+    +String customer_id
+    +String business_id
+    +String status
+  }
+}
+
+package Infrastructure {
+  class SingletonDB {
+    -_instance
+    -_connection
+    +get_instance()
+    +get_connection()
+  }
+
+  class VerificationStrategy <<interface>> {
+    +send_verification(contact)
+    +verify_code(contact, code)
+  }
+
+  class EmailVerificationStrategy
+  class PhoneVerificationStrategy
+}
+
+User "1" -- "*" Booking : creates
+Business "1" -- "*" Booking : receives
+User "1" -- "*" Business : owns
+SingletonDB ..> Booking : persists
+VerificationStrategy <|.. EmailVerificationStrategy
+VerificationStrategy <|.. PhoneVerificationStrategy
+
+@enduml

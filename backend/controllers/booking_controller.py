@@ -16,19 +16,8 @@ def create_booking(customer_id, service_id, booking_time, staff_id=None):
     if not service.is_active:
         raise ValueError("Service is not active")
 
-    # Check for booking conflicts
-    end_time = booking_time + datetime.timedelta(minutes=service.duration_minutes)
-    conflict = Booking.objects(
-        business_id=service.business_id,
-        booking_time__lt=end_time,
-        status__in=['requested', 'accepted']
-    ).first()
-
-    # Calculate actual conflict by checking if existing booking end time overlaps
-    if conflict:
-        conflict_end = conflict.booking_time + datetime.timedelta(minutes=conflict.duration_minutes)
-        if conflict_end > booking_time:
-            raise ValueError("Booking time conflict")
+    # No conflict checking - allows multiple customers to book same business simultaneously
+    # and allows same customer to book multiple services at the same time
 
     booking = Booking(
         business_id=service.business_id,

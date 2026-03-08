@@ -317,6 +317,9 @@ def bookings():
         cust_name = None
         biz_name = None
         owner_name = None
+        payment_received = False
+        payment_received_by = None
+        payment_received_at = None
         try:
             cust = User.objects.get(user_id=bk.customer_id)
             cust_name = cust.name
@@ -340,6 +343,9 @@ def bookings():
             setattr(bk, 'customer_name', cust_name)
             setattr(bk, 'business_name', biz_name)
             setattr(bk, 'owner_name', owner_name)
+            setattr(bk, 'payment_received', getattr(bk, 'payment_received', False))
+            setattr(bk, 'payment_received_by', getattr(bk, 'payment_received_by', None))
+            setattr(bk, 'payment_received_at', getattr(bk, 'payment_received_at', None))
         except Exception:
             pass
         bookings_list.append(bk)
@@ -387,6 +393,10 @@ def update_booking_status(booking_id):
         # Admin restriction: only allow setting to completed or cancelled
         if new_status not in ['completed', 'cancelled']:
             flash('Admins can only set a booking to Completed or Cancelled.', 'danger')
+            return redirect(url_for('admin.booking_detail', booking_id=booking_id))
+        # If admin is attempting to mark completed, require business owner to mark payment received first
+        if new_status == 'completed' and not getattr(booking, 'payment_received', False):
+            flash('Cannot mark Completed: payment has not been marked received by the business owner.', 'danger')
             return redirect(url_for('admin.booking_detail', booking_id=booking_id))
         # Update status using the model's update_status method
         booking.update_status(new_status)

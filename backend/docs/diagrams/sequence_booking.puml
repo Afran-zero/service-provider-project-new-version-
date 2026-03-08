@@ -1,0 +1,17 @@
+@startuml
+actor Customer
+participant "Frontend (browser)" as FE
+participant "BookingController" as BC
+participant "BookingModel" as BM
+participant "SingletonDB" as DB
+participant "Observer/Notifier" as OBS
+
+Customer -> FE: selects service + submits booking
+FE -> BC: POST /booking/create (form)
+BC -> BM: create_booking(data)
+BM -> DB: save(Booking)
+BM -> OBS: notify_subscribers(booking)
+OBS -> BM: send_notifications()
+BC -> FE: 200 Created / redirect to booking detail
+
+@enduml

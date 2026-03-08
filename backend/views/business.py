@@ -76,6 +76,23 @@ def view_business(business_id):
     except Exception:
         pass
 
+    # If the business is inactive, hide it from public users (only owner or admin may view)
+    try:
+        if not business_details.get('is_active', True):
+            allowed = False
+            if current_user.is_authenticated:
+                if business_details.get('owner_id') == getattr(current_user, 'user_id', None):
+                    allowed = True
+                if getattr(current_user, 'role', None) == 'admin':
+                    allowed = True
+            if not allowed:
+                flash('Business not found', 'danger')
+                return redirect(url_for('home.index'))
+    except Exception:
+        # If anything goes wrong with visibility check, default to hiding the business
+        flash('Business not found', 'danger')
+        return redirect(url_for('home.index'))
+
     return render_template('business_detail.html', 
                          business=business_details, 
                          services=services,
@@ -164,8 +181,11 @@ def deactivate_business(business_id):
         return redirect(url_for('business.view_business', business_id=business_id))
     
     try:
-        business_controller.deactivate_business(business_id)
-        flash('Business deactivated successfully', 'success')
+        updated = business_controller.deactivate_business(business_id)
+        if updated and getattr(updated, 'is_active', False):
+            flash('Business activated successfully', 'success')
+        else:
+            flash('Business deactivated successfully', 'success')
         return redirect(url_for('home.dashboard'))
     except Exception as e:
         flash(f'Error deactivating business: {str(e)}', 'danger')
@@ -199,7 +219,22 @@ def list_services(business_id):
     if not business:
         flash('Business not found', 'danger')
         return redirect(url_for('business.list_businesses'))
-    
+    # If the business is inactive, hide it from public users (only owner or admin may view)
+    try:
+        if not getattr(business, 'is_active', True):
+            allowed = False
+            if current_user.is_authenticated:
+                if getattr(business, 'owner_id', None) == getattr(current_user, 'user_id', None):
+                    allowed = True
+                if getattr(current_user, 'role', None) == 'admin':
+                    allowed = True
+            if not allowed:
+                flash('Business not found', 'danger')
+                return redirect(url_for('business.list_businesses'))
+    except Exception:
+        flash('Business not found', 'danger')
+        return redirect(url_for('business.list_businesses'))
+
     services = business_controller.get_services_by_business(business_id)
     return render_template('business/services.html', business=business, services=services)
 

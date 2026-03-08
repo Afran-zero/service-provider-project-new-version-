@@ -99,10 +99,12 @@
                                     {% for booking in pending_bookings[:5] %}
                                     <tr>
                                         <td>
-                                            <small class="text-muted">{{ booking.service_id }}</small>
+                                            {% set svc = services_map.get(booking.service_id) if services_map is defined else None %}
+                                            <small class="text-muted">{{ svc.name if svc else booking.service_id }}</small>
                                         </td>
                                         <td>
-                                            {{ booking.customer_id }}
+                                            {% set cust = customers_map.get(booking.customer_id) if customers_map is defined else None %}
+                                            {{ cust.name if cust else booking.customer_id }}
                                         </td>
                                         <td>
                                             <small>{{ booking.booking_time.strftime('%Y-%m-%d %H:%M') }}</small>

@@ -27,6 +27,32 @@ owner_business_bp = Blueprint(
 )
 
 
+def is_ajax_request(req=None):
+    """Return True if the request appears to be an AJAX/JS fetch requesting JSON."""
+    if req is None:
+        from flask import request as _r
+        req = _r
+    # Old Flask had request.is_xhr; replace with header check
+    try:
+        if req.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return True
+    except Exception:
+        pass
+    # Also treat JSON requests or Accept: application/json as AJAX
+    try:
+        if req.is_json:
+            return True
+    except Exception:
+        pass
+    try:
+        accept = req.headers.get('Accept', '')
+        if 'application/json' in accept:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 @owner_business_bp.route('/dashboard', methods=['GET'])
 @business_owner_required
 def dashboard():
@@ -58,6 +84,15 @@ def dashboard():
             business_id__in=business_ids,
             status='requested'
         ).order_by('-created_at')
+        # Enrich pending bookings with service and customer lookups for display
+        from models.user import User
+        from models.business import Service
+
+        service_ids = [b.service_id for b in pending_bookings]
+        customer_ids = [b.customer_id for b in pending_bookings]
+
+        services = {s.service_id: s for s in Service.objects(service_id__in=service_ids)}
+        customers = {u.user_id: u for u in User.objects(user_id__in=customer_ids)}
         
         # Get stats
         all_bookings = Booking.objects(business_id__in=business_ids)
@@ -82,7 +117,9 @@ def dashboard():
             'owner/dashboard.html',
             businesses=owner_businesses,
             pending_bookings=pending_bookings,
-            stats=stats
+            stats=stats,
+            services_map=services,
+            customers_map=customers
         )
         
     except Exception as e:
@@ -252,12 +289,29 @@ def view_bookings():
                 business_id__in=business_ids,
                 status=status_filter
             ).order_by('-created_at')
+            
+        # Enrich bookings with Service and Customer data
+        from models.user import User
+        from models.business import Service
+        
+        # Collect IDs
+        service_ids = [b.service_id for b in bookings]
+        customer_ids = [b.customer_id for b in bookings]
+        
+        # Fetch objects
+        services = {s.service_id: s for s in Service.objects(service_id__in=service_ids)}
+        customers = {u.user_id: u for u in User.objects(user_id__in=customer_ids)}
+        
+        # Create a list of enriched booking objects (or just pass the lookups)
+        # Passing lookups is cleaner for the template
         
         return render_template(
             'owner/bookings.html',
             bookings=bookings,
             status_filter=status_filter,
-            business_ids=business_ids
+            business_ids=business_ids,
+            services_map=services,
+            customers_map=customers
         )
         
     except Exception as e:
@@ -275,14 +329,20 @@ def view_booking_detail(booking_id):
     Accessible by: The owner of the business associated with the booking
     """
     try:
-        booking = Booking.objects(booking_id=booking_id).first()
+        try:
+            booking = Booking.objects.get(booking_id=booking_id)
+        except Booking.DoesNotExist:
+            booking = None
         
         if not booking:
             flash('Booking not found', 'danger')
             return redirect(url_for('owner_business.view_bookings'))
         
         # Verify ownership of the business
-        business = Business.objects(business_id=booking.business_id).first()
+        try:
+            business = Business.objects.get(business_id=booking.business_id)
+        except Business.DoesNotExist:
+            business = None
         if not business or business.owner_id != current_user.user_id:
             flash('You are not authorized to view this booking', 'danger')
             return redirect(url_for('owner_business.view_bookings'))
@@ -291,8 +351,14 @@ def view_booking_detail(booking_id):
         from models.user import User
         from models.business import Service
         
-        customer = User.objects(user_id=booking.customer_id).first()
-        service = Service.objects(service_id=booking.service_id).first()
+        try:
+            customer = User.objects.get(user_id=booking.customer_id)
+        except User.DoesNotExist:
+            customer = None
+        try:
+            service = Service.objects.get(service_id=booking.service_id)
+        except Service.DoesNotExist:
+            service = None
         
         return render_template(
             'owner/booking_detail.html',
@@ -323,15 +389,25 @@ def accept_booking(booking_id):
     Accessible by: The owner of the business (verified by decorator and command)
     """
     try:
-        booking = Booking.objects(booking_id=booking_id).first()
+        try:
+            booking = Booking.objects.get(booking_id=booking_id)
+        except Booking.DoesNotExist:
+            booking = None
         
         if not booking:
+            if is_ajax_request(request):
+                return jsonify({'success': False, 'error': 'Booking not found'}), 404
             flash('Booking not found', 'danger')
             return redirect(url_for('owner_business.view_bookings'))
         
         # Verify business ownership (double-check before command)
-        business = Business.objects(business_id=booking.business_id).first()
+        try:
+            business = Business.objects.get(business_id=booking.business_id)
+        except Business.DoesNotExist:
+            business = None
         if not business or business.owner_id != current_user.user_id:
+            if is_ajax_request(request):
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 403
             flash('You are not authorized to accept this booking', 'danger')
             logger.warning(
                 f"Unauthorized accept attempt by {current_user.user_id} on booking {booking_id}"
@@ -343,13 +419,24 @@ def accept_booking(booking_id):
             command = AcceptBookingCommand(booking_id, current_user.user_id)
             result = command.execute()
             
-            flash(
-                f'Booking {booking_id} accepted successfully! Customer will be notified.',
-                'success'
-            )
             logger.info(
                 f"Booking {booking_id} accepted by owner {current_user.user_id}. "
                 f"Command: {command.get_description()}"
+            )
+            
+            # Check if AJAX request
+            if is_ajax_request(request):
+                return jsonify({
+                    'success': True,
+                    'message': 'Booking accepted successfully! Customer will be notified.',
+                    'booking_id': booking_id,
+                    'status': result.status,
+                    'redirect_url': url_for('owner_business.view_bookings')
+                })
+            
+            flash(
+                f'Booking {booking_id} accepted successfully! Customer will be notified.',
+                'success'
             )
             
             # Redirect back to booking detail or bookings list
@@ -357,6 +444,8 @@ def accept_booking(booking_id):
             return redirect(next_page)
             
         except ValueError as e:
+            if request.is_xhr or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'error': str(e)}), 400
             flash(f'Cannot accept booking: {str(e)}', 'danger')
             logger.error(f"Command execution error for booking {booking_id}: {str(e)}")
             return redirect(url_for('owner_business.view_booking_detail', booking_id=booking_id))
@@ -381,52 +470,153 @@ def reject_booking(booking_id):
     
     Accessible by: The owner of the business (verified by decorator and command)
     """
+    logger.info(f"=== REJECT BOOKING START: {booking_id} ===")
+    
     try:
-        booking = Booking.objects(booking_id=booking_id).first()
+        # Step 1: Fetch booking
+        logger.info(f"Step 1: Fetching booking {booking_id}")
+        try:
+            booking = Booking.objects.get(booking_id=booking_id)
+            logger.info(f"  ✓ Booking found: status={booking.status}")
+        except Booking.DoesNotExist:
+            booking = None
+            logger.warning(f"  ✗ Booking not found")
         
         if not booking:
+            logger.warning(f"Booking {booking_id} not found, redirecting")
+            if is_ajax_request(request):
+                return jsonify({'success': False, 'error': 'Booking not found'}), 404
             flash('Booking not found', 'danger')
             return redirect(url_for('owner_business.view_bookings'))
         
-        # Verify business ownership (double-check before command)
-        business = Business.objects(business_id=booking.business_id).first()
+        # Step 2: Verify business ownership
+        logger.info(f"Step 2: Verifying business ownership for {booking.business_id}")
+        try:
+            business = Business.objects.get(business_id=booking.business_id)
+            logger.info(f"  ✓ Business found: owner={business.owner_id}, current_user={current_user.user_id}")
+        except Business.DoesNotExist:
+            business = None
+            logger.warning(f"  ✗ Business not found")
+        
         if not business or business.owner_id != current_user.user_id:
+            logger.warning(f"Unauthorized reject attempt by {current_user.user_id} on booking {booking_id}")
+            if is_ajax_request(request):
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 403
             flash('You are not authorized to reject this booking', 'danger')
-            logger.warning(
-                f"Unauthorized reject attempt by {current_user.user_id} on booking {booking_id}"
-            )
             return redirect(url_for('owner_business.view_bookings'))
         
-        # Get rejection reason from form (optional)
+        # Step 3: Get rejection reason from form
+        logger.info(f"Step 3: Getting rejection reason from form")
         reason = request.form.get('reason', '')
+        logger.info(f"  ✓ Reason: {reason or '(none)'}")
         
-        # Execute Command Pattern
+        # Step 4: Execute Command Pattern
+        logger.info(f"Step 4: Creating and executing RejectBookingCommand")
         try:
             command = RejectBookingCommand(booking_id, current_user.user_id, reason=reason)
+            logger.info(f"  ✓ Command created, executing...")
             result = command.execute()
+            logger.info(f"  ✓ Command executed successfully, new status={result.status}")
             
-            flash(
-                f'Booking {booking_id} rejected successfully! Customer will be notified.',
-                'success'
-            )
-            logger.info(
-                f"Booking {booking_id} rejected by owner {current_user.user_id}. "
-                f"Reason: {reason or 'None provided'}. Command: {command.get_description()}"
-            )
+            logger.info(f"Booking {booking_id} rejected successfully by owner {current_user.user_id}")
             
-            # Redirect back to booking detail or bookings list
-            next_page = request.referrer or url_for('owner_business.view_bookings')
+            # Step 5: Check if AJAX request
+            if is_ajax_request(request):
+                logger.info(f"Step 5: AJAX request detected, returning JSON")
+                return jsonify({
+                    'success': True,
+                    'message': 'Booking rejected successfully!',
+                    'booking_id': booking_id,
+                    'status': result.status,
+                    'redirect_url': url_for('owner_business.view_booking_detail', booking_id=booking_id)
+                })
+            
+            # Step 5: Flash success message (after command completes)
+            logger.info(f"Step 5: Flashing success message")
+            flash(f'Booking rejected successfully!', 'success')
+            
+            # Step 6: Redirect
+            logger.info(f"Step 6: Redirecting")
+            next_page = request.referrer or url_for('owner_business.view_booking_detail', booking_id=booking_id)
+            logger.info(f"  ✓ Redirecting to {next_page}")
             return redirect(next_page)
             
         except ValueError as e:
+            logger.error(f"ValueError in command execution: {str(e)}")
+            if is_ajax_request(request):
+                return jsonify({'success': False, 'error': str(e)}), 400
             flash(f'Cannot reject booking: {str(e)}', 'danger')
-            logger.error(f"Command execution error for booking {booking_id}: {str(e)}")
+            return redirect(url_for('owner_business.view_booking_detail', booking_id=booking_id))
+        except Exception as e:
+            logger.error(f"Unexpected error in command execution: {str(e)}", exc_info=True)
+            if is_ajax_request(request):
+                return jsonify({'success': False, 'error': str(e)}), 500
+            flash(f'Error executing command: {str(e)}', 'danger')
             return redirect(url_for('owner_business.view_booking_detail', booking_id=booking_id))
         
     except Exception as e:
+        logger.error(f"Outer exception in reject_booking: {str(e)}", exc_info=True)
+        if is_ajax_request(request):
+            return jsonify({'success': False, 'error': str(e)}), 500
         flash(f'Error rejecting booking: {str(e)}', 'danger')
-        logger.error(f"Unexpected error rejecting booking {booking_id}: {str(e)}")
         return redirect(url_for('owner_business.view_bookings'))
+    finally:
+        logger.info(f"=== REJECT BOOKING END: {booking_id} ===")
+
+
+
+@owner_business_bp.route('/booking/<booking_id>/mark-payment', methods=['POST'])
+@business_owner_required
+def mark_payment_received(booking_id):
+    """Mark a booking as payment received (prototype) by the business owner.
+
+    This toggles the `payment_received` flag to True and records timestamp and owner id.
+    """
+    try:
+        try:
+            booking = Booking.objects.get(booking_id=booking_id)
+        except Booking.DoesNotExist:
+            return jsonify({'success': False, 'error': 'Booking not found'}), 404
+
+        # Verify owner owns the business for this booking
+        try:
+            business = Business.objects.get(business_id=booking.business_id)
+        except Business.DoesNotExist:
+            return jsonify({'success': False, 'error': 'Business not found'}), 404
+
+        if business.owner_id != current_user.user_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        # Mark payment received
+        import datetime
+        booking.payment_received = True
+        booking.payment_received_at = datetime.datetime.utcnow()
+        booking.payment_received_by = current_user.user_id
+        booking.updated_at = datetime.datetime.utcnow()
+        booking.save()
+
+        # Audit log entry
+        try:
+            from models.audit_log import AuditLog
+            AuditLog(
+                action='payment_marked_received',
+                actor_id=current_user.user_id,
+                actor_role='business_owner',
+                target_type='booking',
+                target_id=booking.booking_id,
+                details={
+                    'business_id': booking.business_id,
+                    'amount': booking.price,
+                }
+            ).save()
+        except Exception:
+            logger.exception('Failed to write audit log for payment marking')
+
+        return jsonify({'success': True, 'message': 'Payment marked as received'}), 200
+
+    except Exception as e:
+        logger.error(f"Error marking payment for booking {booking_id}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @owner_business_bp.route('/booking/<booking_id>/stats', methods=['GET'])
@@ -438,18 +628,27 @@ def booking_stats_api(booking_id):
     Returns JSON with booking details and status information.
     """
     try:
-        booking = Booking.objects(booking_id=booking_id).first()
+        try:
+            booking = Booking.objects.get(booking_id=booking_id)
+        except Booking.DoesNotExist:
+            booking = None
         
         if not booking:
             return jsonify({'error': 'Booking not found'}), 404
         
         # Verify ownership
-        business = Business.objects(business_id=booking.business_id).first()
+        try:
+            business = Business.objects.get(business_id=booking.business_id)
+        except Business.DoesNotExist:
+            business = None
         if not business or business.owner_id != current_user.user_id:
             return jsonify({'error': 'Unauthorized'}), 403
         
         from models.user import User
-        customer = User.objects(user_id=booking.customer_id).first()
+        try:
+            customer = User.objects.get(user_id=booking.customer_id)
+        except User.DoesNotExist:
+            customer = None
         
         return jsonify({
             'booking_id': booking.booking_id,

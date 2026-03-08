@@ -241,7 +241,25 @@
 function toggleActiveStatus() {
     const action = "{{ 'deactivate' if business.is_active else 'activate' }}";
     if (confirm(`Are you sure you want to ${action} this business?`)) {
-        console.log('Toggle status:', action);
+        const url = "{{ url_for('business.deactivate_business', business_id=business.business_id) }}";
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json'
+            }
+        }).then(resp => {
+            if (resp.redirected) {
+                window.location = resp.url;
+                return;
+            }
+            return resp.text();
+        }).then(() => {
+            // Reload to reflect updated status
+            window.location.reload();
+        }).catch(err => {
+            console.error('Toggle failed', err);
+            alert('Failed to toggle business status');
+        });
     }
 }
 

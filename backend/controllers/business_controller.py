@@ -268,7 +268,8 @@ def deactivate_business(business_id):
     if not business:
         return None
 
-    business.is_active = False
+    # Toggle active state to allow re-activation by owner/admin
+    business.is_active = not bool(getattr(business, 'is_active', False))
     business.updated_at = datetime.datetime.utcnow()
     business.save()
     return business

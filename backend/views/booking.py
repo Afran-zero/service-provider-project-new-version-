@@ -24,6 +24,7 @@ def create_booking():
         booking_date = data.get('booking_date')
         booking_time = data.get('booking_time')
         notes = data.get('notes', '')
+        payment_method = data.get('payment_method', 'cash')
         
         # Validate required fields
         if not all([business_id, service_id, booking_date, booking_time]):
@@ -67,6 +68,7 @@ def create_booking():
                 else:
                     existing_datetime = existing_time
                 
+                # Check if times conflict (same time)
                 if existing_datetime == booking_datetime:
                     return jsonify({
                         'success': False, 
@@ -80,7 +82,8 @@ def create_booking():
             customer_id=current_user.user_id,
             service_id=service_id,
             booking_time=booking_datetime,
-            notes=notes
+            notes=notes,
+            payment_method=payment_method
         )
         
         invoker = BookingCommandInvoker()
@@ -89,7 +92,7 @@ def create_booking():
         return jsonify({
             'success': True, 
             'message': 'Booking created successfully',
-            'booking_id': booking.id
+            'booking_id': booking.booking_id
         }), 200
         
     except ValueError as e:
